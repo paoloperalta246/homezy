@@ -820,8 +820,22 @@ const Bookings = () => {
                             (cancelledBooking.guests.pets || 0)
                             : 1;
 
-                          // 🔹 Send cancellation email (POST request)
-                          const response = await fetch("http://localhost:4000/send-cancellation", {
+                          // // 🔹 Send cancellation email (POST request)
+                          // const response = await fetch("http://localhost:4000/send-cancellation", {
+                          //   method: "POST",
+                          //   headers: { "Content-Type": "application/json" },
+                          //   body: JSON.stringify({
+                          //     email: guestEmail,
+                          //     fullName: guestFullName,
+                          //     listingTitle: cancelledBooking.listingTitle || "Booking",
+                          //     checkIn: safeCheckIn,
+                          //     checkOut: safeCheckOut,
+                          //     guests: totalGuests,
+                          //     price: cancelledBooking.price || 0,
+                          //   }),
+                          // });
+
+                          const response = await fetch("/.netlify/functions/sendCancellation", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({

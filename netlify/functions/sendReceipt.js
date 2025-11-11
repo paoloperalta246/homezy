@@ -1,0 +1,48 @@
+const sgMail = require("@sendgrid/mail");
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+exports.handler = async function(event, context) {
+  try {
+    const { email, fullName, listingTitle, checkIn, checkOut, guests, price } = JSON.parse(event.body);
+
+    const msg = {
+      to: email,
+      from: { name: "Homezy Support 🏠", email: "paoloschoolacc@gmail.com" },
+      subject: `🏠 Your Homezy Booking Receipt – ${listingTitle}`,
+      html: `
+      <div style="background-color:#f4f6f8; padding:50px 0; font-family:'Inter', sans-serif;">
+        <div style="max-width:640px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.08);">
+          <div style="background:linear-gradient(135deg, #f97316, #fb923c); padding:30px 20px; text-align:center;">
+            <h1 style="color:white; margin:0; font-size:28px;">Homezy Booking Receipt</h1>
+          </div>
+          <div style="padding:40px 35px; text-align:left;">
+            <h2 style="color:#222; font-weight:700;">Hi ${fullName || "there"}! 👋</h2>
+            <p style="color:#444; font-size:16px;">Thank you for booking with <strong style="color:#f97316;">Homezy</strong>. Here are your booking details:</p>
+            <div style="background:#f9fafb; padding:30px; border-radius:12px; border:1px solid #e0e0e0;">
+              <table style="width:100%; font-size:15px; color:#333; border-collapse:collapse;">
+                <tbody>
+                  <tr style="background:#fff;"><td style="padding:12px 15px;"><strong>Listing</strong></td><td style="padding:12px 15px;">${listingTitle}</td></tr>
+                  <tr style="background:#f4f6f8;"><td style="padding:12px 15px;"><strong>Check-in</strong></td><td style="padding:12px 15px;">${checkIn}</td></tr>
+                  <tr style="background:#fff;"><td style="padding:12px 15px;"><strong>Check-out</strong></td><td style="padding:12px 15px;">${checkOut}</td></tr>
+                  <tr style="background:#f4f6f8;"><td style="padding:12px 15px;"><strong>Guests</strong></td><td style="padding:12px 15px;">${guests || "1"}</td></tr>
+                  <tr style="background:#fff;"><td style="padding:12px 15px;"><strong>Total Paid</strong></td><td style="padding:12px 15px;">PHP ${price}</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div style="background:#f9fafb; padding:20px; text-align:center; border-top:1px solid #eee;">
+            <p style="font-size:12px; color:#999; margin:0;">© ${new Date().getFullYear()} Homezy, Inc. All rights reserved.</p>
+          </div>
+        </div>
+      </div>`
+    };
+
+    await sgMail.send(msg);
+
+    return { statusCode: 200, body: JSON.stringify({ success: true, message: "Receipt email sent!" }) };
+  } catch (error) {
+    console.error("❌ Error sending receipt email:", error);
+    return { statusCode: 500, body: JSON.stringify({ success: false, error: error.message }) };
+  }
+};

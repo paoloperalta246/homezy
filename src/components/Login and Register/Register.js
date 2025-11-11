@@ -58,11 +58,18 @@ function Register() {
         timestamp: new Date(),
       });
 
-      await fetch("http://localhost:4000/send-verification", {
+      // await fetch("http://localhost:4000/send-verification", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ email, fullName: displayName }),
+      // });
+
+      await fetch("/.netlify/functions/sendVerification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, fullName: displayName }),
       });
+
 
       setMessage("✅ Registration successful! Check your email for a verification link before logging in.");
       setFirstName("");

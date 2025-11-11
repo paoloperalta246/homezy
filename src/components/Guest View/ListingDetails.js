@@ -1379,7 +1379,21 @@ const ListingDetails = () => {
                         createdAt: serverTimestamp(),
                       });
 
-                      await fetch("http://localhost:4000/send-receipt", {
+                      // await fetch("http://localhost:4000/send-receipt", {
+                      //   method: "POST",
+                      //   headers: { "Content-Type": "application/json" },
+                      //   body: JSON.stringify({
+                      //     email: auth.currentUser.email,
+                      //     fullName: auth.currentUser.displayName || "",
+                      //     listingTitle: listing?.title || "Booking",
+                      //     checkIn: safeCheckIn,
+                      //     checkOut: safeCheckOut,
+                      //     guests: totalGuests,
+                      //     price: listing?.price || 0,
+                      //   }),
+                      // });
+
+                      await fetch("/.netlify/functions/sendReceipt", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
