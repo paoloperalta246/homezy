@@ -1,4 +1,13 @@
 const sgMail = require("@sendgrid/mail");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+
+// 🔑 Initialize Firebase using your environment variable
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+initializeApp({
+  credential: cert(serviceAccount),
+});
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -7,8 +16,13 @@ exports.handler = async function(event, context) {
     const { email, fullName } = JSON.parse(event.body);
     const fullNameGreet = fullName || "there";
 
-    // Firebase verification link placeholder (replace with real one if needed)
-    const link = "https://your-homezy-site.com/verified";
+    // ✅ Generate Firebase verification link
+    const actionCodeSettings = {
+      url: "https://app-homezy.netlify.app/verified", // your Verified.js page
+      handleCodeInApp: false,
+    };
+
+    const link = await getAuth().generateEmailVerificationLink(email, actionCodeSettings);
 
     const msg = {
       to: email,
