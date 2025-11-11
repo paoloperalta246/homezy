@@ -1,0 +1,9 @@
+{
+  "name": "homezy-netlify-functions",
+  "version": "1.0.0",
+  "description": "Netlify serverless functions for Homezy",
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "firebase-admin": "^13.5.0"
+  }
+}

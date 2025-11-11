@@ -64,12 +64,19 @@ function Register() {
       //   body: JSON.stringify({ email, fullName: displayName }),
       // });
 
-      await fetch("/.netlify/functions/sendVerification", {
+      const emailResponse = await fetch("/.netlify/functions/sendVerification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, fullName: displayName }),
       });
 
+      const emailResult = await emailResponse.json();
+      
+      if (!emailResponse.ok || !emailResult.success) {
+        console.error("❌ Failed to send verification email:", emailResult.error);
+        setMessage("⚠️ Registration successful, but verification email failed. Please contact support.");
+        return;
+      }
 
       setMessage("✅ Registration successful! Check your email for a verification link before logging in.");
       setFirstName("");
