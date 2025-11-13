@@ -2,7 +2,9 @@
 // In development we hit the local Express server (server.js on port 4000)
 // In production (Netlify) we call deployed serverless functions
 export const getEmailEndpoint = (type) => {
-  const isDev = process.env.NODE_ENV === 'development';
+  // Check if running on localhost (development) or deployed (production)
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
   if (isDev) {
     switch (type) {
       case 'verification': return 'http://localhost:4000/send-verification';
