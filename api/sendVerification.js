@@ -64,14 +64,13 @@ module.exports = async (req, res) => {
 
     const { email, fullName } = await readJson();
 
-    // Generate Firebase verification link with production URL
-    const continueUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/verified`
-      : 'https://homezy-beta.vercel.app/verified';
+    // Generate Firebase verification link with FIXED production URL
+    // Always use the main production domain to avoid Firebase authorized domain issues
+    const continueUrl = 'https://homezy-beta.vercel.app/verified';
     
     const actionCodeSettings = {
       url: continueUrl,
-      handleCodeInApp: false  // Use false so Firebase handles it in their widget first, then redirects
+      handleCodeInApp: false
     };
     
     const link = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
