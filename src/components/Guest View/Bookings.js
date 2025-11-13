@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { auth, db } from "../../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { getEmailEndpoint, postJson } from '../../utils/api';
+import { getEmailEndpoint } from '../../utils/api';
 import {
   collection,
   addDoc,

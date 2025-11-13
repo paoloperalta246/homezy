@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { getAuth, applyActionCode, checkActionCode } from "firebase/auth";
-import { getFirestore, doc, updateDoc } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
 import logo from "./images/homezy-logo.png";
 

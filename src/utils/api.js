@@ -13,10 +13,10 @@ export const getEmailEndpoint = (type) => {
       default: throw new Error('Unknown email endpoint type: ' + type);
     }
   } else {
-    // Production: Works for both Vercel (/api/) and Netlify (/.netlify/functions/)
-    // Check if deployed on Vercel or Netlify
-    const isVercel = window.location.hostname.includes('vercel.app');
-    const baseUrl = isVercel ? '/api' : '/.netlify/functions';
+    // Production: default to Vercel-style "/api" routes.
+    // If running on a Netlify domain, use Netlify functions path instead.
+    const isNetlify = window.location.hostname.includes('netlify.app');
+    const baseUrl = isNetlify ? '/.netlify/functions' : '/api';
     
     switch (type) {
       case 'verification': return `${baseUrl}/sendVerification`;

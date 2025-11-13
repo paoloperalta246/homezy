@@ -9,7 +9,7 @@ import {
 import LoginBackground from "./images/login-background-image.jpg";
 import Logo from "./images/homezy-logo.png";
 import GoogleIcon from "./images/google-icon.png";
-import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
 import { getEmailEndpoint } from "../../utils/api";
 
 function Login() {

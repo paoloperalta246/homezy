@@ -6,7 +6,7 @@ import { auth, db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import axios from "axios";
-import { onAuthStateChanged, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getEmailEndpoint } from "../../utils/api";
 
 export default function HostVerification() {

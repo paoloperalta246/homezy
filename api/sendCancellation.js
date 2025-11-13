@@ -3,6 +3,20 @@ const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 module.exports = async (req, res) => {
+  // Helper: safely read JSON body across environments
+  const readJson = () => new Promise((resolve, reject) => {
+    try {
+      if (req.body && typeof req.body === 'object' && Object.keys(req.body).length) {
+        return resolve(req.body);
+      }
+      let data = '';
+      req.on('data', (chunk) => { data += chunk; });
+      req.on('end', () => {
+        try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); }
+      });
+    } catch (e) { reject(e); }
+  });
+
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,9 +27,13 @@ module.exports = async (req, res) => {
     res.status(200).end();
     return;
   }
+  if (req.method !== 'POST') {
+    res.status(405).json({ success: false, error: 'Method Not Allowed' });
+    return;
+  }
 
   try {
-    const { email, fullName, listingTitle, checkIn, checkOut, guests, price } = req.body;
+    const { email, fullName, listingTitle, checkIn, checkOut, guests, price } = await readJson();
 
     const msg = {
       to: email,

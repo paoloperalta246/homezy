@@ -52,7 +52,7 @@ import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 import { enUS } from 'date-fns/locale';
-import { getEmailEndpoint, postJson } from '../../utils/api';
+// Email endpoint imports removed - not used in this component
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { collection, addDoc, serverTimestamp, updateDoc, doc as fsDoc, getDoc as fsGetDoc } from "firebase/firestore";
 import { addPoints } from '../../utils/points';
