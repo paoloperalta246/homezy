@@ -89,14 +89,7 @@ function Register() {
       await signOut(auth);
       console.log('✅ Step 4: User signed out after registration');
 
-      // WAIT HERE - Check your email inbox NOW
-      console.log('⏸️ PAUSE: Check your email inbox. How many emails have you received so far?');
-      console.log('⏸️ If you already have 1 email, then Firebase is auto-sending!');
-      
-      // Wait 3 seconds before sending our custom email
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Send verification email via local server
+      // Send verification email
       console.log('🔵 Step 5: Sending verification email...');
       console.log('📧 Sending verification email to:', email);
       try {
