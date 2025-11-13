@@ -12,7 +12,7 @@ import { doc, setDoc } from "firebase/firestore";
 import RegisterImage from "./images/register-background-image.jpg";
 import Logo from "./images/homezy-logo.png";
 import GoogleIcon from "./images/google-icon.png";
-import { getEmailEndpoint } from "../../utils/api";
+import { getEmailEndpoint, postJson } from "../../utils/api";
 
 function Register() {
   const [firstName, setFirstName] = useState("");
@@ -49,11 +49,13 @@ function Register() {
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters long.");
+      setIsSubmitting(false);
       return;
     }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -98,20 +100,8 @@ function Register() {
       console.log('🔵 Step 5: Sending verification email...');
       console.log('📧 Sending verification email to:', email);
       try {
-        const response = await fetch(getEmailEndpoint('verification'), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, fullName: displayName }),
-        });
-        
-        console.log('📧 Verification email response status:', response.status);
-        const result = await response.json();
+        const result = await postJson(getEmailEndpoint('verification'), { email, fullName: displayName });
         console.log('📧 Verification email result:', result);
-        
-        if (!result.success) {
-          throw new Error(result.error || 'Email send failed');
-        }
-        
         console.log('✅ Step 5: Verification email sent successfully');
       } catch (emailErr) {
         console.error('❌ Verification email error:', emailErr);

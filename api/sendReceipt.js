@@ -1,6 +1,12 @@
 const sgMail = require("@sendgrid/mail");
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+function ensureSendGrid() {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) {
+    throw new Error("Missing SENDGRID_API_KEY environment variable");
+  }
+  sgMail.setApiKey(key);
+}
 
 module.exports = async (req, res) => {
   // Helper: safely read JSON body across environments
@@ -22,6 +28,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -33,6 +40,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    ensureSendGrid();
     const { email, fullName, listingTitle, checkIn, checkOut, guests, price } = await readJson();
 
     const msg = {
@@ -72,6 +80,10 @@ module.exports = async (req, res) => {
     res.status(200).json({ success: true, message: "Receipt email sent!" });
   } catch (error) {
     console.error("❌ Error sending receipt email:", error);
-    res.status(500).json({ success: false, error: error.message });
+    try {
+      res.status(500).json({ success: false, error: error.message || 'Internal Server Error' });
+    } catch (_) {
+      res.end();
+    }
   }
 };

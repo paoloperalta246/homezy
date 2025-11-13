@@ -1,15 +1,30 @@
 const sgMail = require("@sendgrid/mail");
 const admin = require("firebase-admin");
 
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+// Lazy, safe initialization to avoid module-load crashes on missing/invalid env
+function ensureFirebaseAdmin() {
+  if (admin.apps.length) return;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) {
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT environment variable");
+  }
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch (e) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT is not valid JSON");
+  }
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+function ensureSendGrid() {
+  const key = process.env.SENDGRID_API_KEY;
+  if (!key) {
+    throw new Error("Missing SENDGRID_API_KEY environment variable");
+  }
+  // setApiKey is idempotent for same key; calling per request is fine
+  sgMail.setApiKey(key);
+}
 
 module.exports = async (req, res) => {
   // Helper: safely read JSON body across environments
@@ -31,6 +46,7 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -42,6 +58,10 @@ module.exports = async (req, res) => {
   }
 
   try {
+    // Ensure dependencies/env are ready and report JSON errors if not
+    ensureFirebaseAdmin();
+    ensureSendGrid();
+
     const { email, fullName } = await readJson();
 
     // Generate Firebase verification link
@@ -121,6 +141,11 @@ module.exports = async (req, res) => {
     res.status(200).json({ success: true, message: "Verification email sent!" });
   } catch (error) {
     console.error("❌ Error sending verification email:", error);
-    res.status(500).json({ success: false, error: error.message });
+    try {
+      res.status(500).json({ success: false, error: error.message || 'Internal Server Error' });
+    } catch (_) {
+      // If headers already sent or response errored, ensure function returns
+      res.end();
+    }
   }
 };
