@@ -1,8 +1,9 @@
 // 📦 Import dependencies
 const express = require("express");
 const cors = require("cors");
+const admin = require("firebase-admin");
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const sgMail = require("@sendgrid/mail");
 const dotenv = require("dotenv");
 const serviceAccount = require("./serviceAccountKey.json");
@@ -23,21 +24,79 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// 📧 Generate link + send custom email
+const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:3000';
+
+// ✅ Prevent duplicate email sends - track recent sends
+const recentEmailSends = new Map(); // { email: timestamp }
+const EMAIL_COOLDOWN_MS = 10000; // 10 seconds cooldown between sends to same email
+
+// � Firestore (Admin)
+const fs = getFirestore();
+
+// �📧 Generate link + send custom email
 app.post("/send-verification", async (req, res) => {
-  const { email, fullName } = req.body;
+  const { email, fullName, force } = req.body || {};
+
+  const reqId = Math.random().toString(36).slice(2, 8).toUpperCase();
+  console.log(`\n🔔 [${reqId}] ============ VERIFICATION EMAIL REQUEST ============`);
+  console.log('📧 Email:', email);
+  console.log('👤 Full Name:', fullName);
+  console.log('⏰ Timestamp:', new Date().toISOString());
+  console.log('🔁 Force resend:', !!force);
+  
+  // ✅ Check if we recently sent to this email
+  const lastSentTime = recentEmailSends.get(email);
+  const now = Date.now();
+  
+  if (lastSentTime && (now - lastSentTime) < EMAIL_COOLDOWN_MS) {
+    const waitTime = Math.ceil((EMAIL_COOLDOWN_MS - (now - lastSentTime)) / 1000);
+    console.log(`⚠️ [${reqId}] DUPLICATE (cooldown) BLOCKED! Email sent ${Math.floor((now - lastSentTime) / 1000)}s ago. Wait ${waitTime}s.`);
+    console.log('====================================================\n');
+    return res.status(429).json({ 
+      success: false, 
+      error: `Please wait ${waitTime} seconds before requesting another verification email.` 
+    });
+  }
+  
+  console.log('====================================================\n');
 
   try {
+    // 🔐 Lookup Firebase user by email and check verification status
+    let userRecord = null;
+    try {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } catch (e) {
+      console.warn(`[${reqId}] ⚠️ No Firebase user found for email: ${email}`);
+    }
+
+    if (userRecord && userRecord.emailVerified) {
+      console.log(`[${reqId}] ✅ User already verified. Skipping email send.`);
+      return res.status(200).json({ success: true, message: "Already verified. No email sent." });
+    }
+
+    // ✅ Idempotency: persist send state per UID to avoid sending twice across restarts
+    const uidKey = userRecord ? userRecord.uid : `email:${email.toLowerCase()}`; // fallback key if user not yet resolvable
+    const sendDocRef = fs.collection('email_verification_sends').doc(uidKey);
+    const sendDocSnap = await sendDocRef.get();
+
+    if (sendDocSnap.exists && !force) {
+      const data = sendDocSnap.data();
+      const alreadySent = !!data.lastSentAt && !data.verifiedAt;
+      if (alreadySent) {
+        console.log(`[${reqId}] 🚫 Idempotency block: email already sent previously and user not yet verified. Returning 200 without resending.`);
+        return res.status(200).json({ success: true, message: "Verification email already sent." });
+      }
+    }
+
+    // ✅ Record this send immediately (in-memory) to prevent burst duplicates
+    recentEmailSends.set(email, Date.now());
+    
+    // Generate Firebase verification link
+    const link = await admin.auth().generateEmailVerificationLink(email);
+    console.log(`[${reqId}] ✅ Verification link generated:`, link.substring(0, 80) + '...');
+
     // 🪄 Use full name for greeting
     const fullNameGreet = fullName || "there";
-
-    // 🪄 Generate Firebase verification link
-    const actionCodeSettings = {
-      url: "http://localhost:3000/verified",
-      handleCodeInApp: false,
-    };
-
-    const link = await getAuth().generateEmailVerificationLink(email, actionCodeSettings);
 
     // 📧 Email Verification Route
     const msg = {
@@ -109,9 +168,33 @@ app.post("/send-verification", async (req, res) => {
 
     // ✉️ Send email
     await sgMail.send(msg);
+    console.log(`[${reqId}] ✉️ Verification email sent via SendGrid`);
+
+    // 🧾 Persist send record (idempotency)
+    await sendDocRef.set({
+      uid: userRecord ? userRecord.uid : null,
+      email,
+      fullName: fullName || null,
+      lastSentAt: FieldValue.serverTimestamp(),
+      verifiedAt: userRecord && userRecord.emailVerified ? FieldValue.serverTimestamp() : null,
+      count: FieldValue.increment(1),
+    }, { merge: true });
+    
+    // ✅ Clean up old entries to prevent memory leak (keep last hour)
+    const oneHourAgo = Date.now() - 3600000;
+    for (const [emailKey, timestamp] of recentEmailSends.entries()) {
+      if (timestamp < oneHourAgo) {
+        recentEmailSends.delete(emailKey);
+      }
+    }
+    
     res.status(200).json({ success: true, message: "Verification email sent!" });
   } catch (error) {
-    console.error("❌ Error sending verification email:", error);
+    console.error(`[${reqId}] ❌ Error sending verification email:`, error);
+    
+    // ✅ Remove from cooldown if send failed, so user can retry
+    recentEmailSends.delete(email);
+    
     res.status(500).json({ success: false, error: error.message });
   }
 });

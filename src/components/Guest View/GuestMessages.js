@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Search,
   Send,
+  Bell,
 } from "lucide-react";
 
 import {
@@ -293,6 +294,16 @@ const GuestMessages = () => {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
             {/* 👤 User Dropdown */}
             <div className="relative">
               <button
@@ -319,11 +330,17 @@ const GuestMessages = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -345,11 +362,17 @@ const GuestMessages = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -448,6 +471,13 @@ const GuestMessages = () => {
 
               {user ? (
                 <>
+                  <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}
@@ -549,11 +579,17 @@ const GuestMessages = () => {
                         : "hover:bg-gray-50"
                         }`}
                     >
-                      <img
-                        src={c.other?.photoURL || defaultProfile}
-                        alt="pfp"
-                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                      />
+                      {c.other?.photoURL ? (
+                        <img
+                          src={c.other.photoURL}
+                          alt="pfp"
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                          {(c.other?.fullName || c.other?.firstName || c.other?.email || "H").charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
                           <p className="font-medium text-[#0B2545] truncate">
@@ -593,11 +629,17 @@ const GuestMessages = () => {
                     onClick={() => openChatWith(h)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all duration-200"
                   >
-                    <img
-                      src={h.photoURL || defaultProfile}
-                      alt="host"
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
+                    {h.photoURL ? (
+                      <img
+                        src={h.photoURL}
+                        alt="host"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                        {(h.fullName || h.firstName || h.email || "H").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="font-medium text-[#0B2545] text-left">
                         {h.fullName || h.firstName || "Host"}
@@ -617,11 +659,17 @@ const GuestMessages = () => {
           <div className="px-4 sm:px-5 py-3 sm:py-4 border-b flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-orange-50 to-white">
             {activeChat ? (
               <>
-                <img
-                  src={activeChat.otherUser.photoURL || defaultProfile}
-                  alt="other"
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200"
-                />
+                {activeChat.otherUser.photoURL ? (
+                  <img
+                    src={activeChat.otherUser.photoURL}
+                    alt="other"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200"
+                  />
+                ) : (
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl border border-gray-200 flex-shrink-0">
+                    {(activeChat.otherUser.fullName || activeChat.otherUser.firstName || activeChat.otherUser.email || "H").charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <div className="font-semibold text-base sm:text-lg text-[#0B2545]">
                     {activeChat.otherUser.fullName || activeChat.otherUser.firstName}
@@ -708,8 +756,6 @@ const GuestMessages = () => {
           </form>
         </section>
       </main>
-
-
     </div>
   );
 };

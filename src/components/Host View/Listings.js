@@ -16,7 +16,7 @@ import {
 import { auth, db } from "../../firebase";
 import homezyLogo from "./images/homezy-logo.png";
 import defaultProfile from "./images/default-profile.png";
-import { Home, Clipboard, Gift, User, MessageSquare, Calendar, Ticket } from "lucide-react";
+import { Home, Clipboard, Gift, User, MessageSquare, Calendar, Ticket, DollarSign, Bell, LogOut } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -341,11 +341,14 @@ const Listings = () => {
               <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
             </div>
             <nav className="flex flex-col mt-4">
+              {getNavItem("/host-notifications", "Notifications", Bell)}
+              <div className="border-t border-gray-300 my-4 mx-6"></div>
               {getNavItem("/dashboard", "Dashboard", Home)}
               {getNavItem("/listings", "My Listings", Clipboard)}
               {getNavItem("/host-messages", "Messages", MessageSquare)}
               {getNavItem("/calendar", "Calendar", Calendar)}
               {getNavItem("/points-rewards", "Points & Rewards", Gift)}
+              {getNavItem("/earnings", "Earnings", DollarSign)}
             </nav>
           </div>
 
@@ -360,11 +363,17 @@ const Listings = () => {
               }
               className="flex items-center justify-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-medium hover:bg-gray-300 transition w-full"
             >
-              <img
-                src={host?.photoURL || defaultProfile}
-                alt="profile"
-                className="w-6 h-6 rounded-full object-cover"
-              />
+              {host?.photoURL ? (
+                <img
+                  src={host.photoURL}
+                  alt="profile"
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                  {(host?.firstName || host?.email || "H").charAt(0).toUpperCase()}
+                </div>
+              )}
               <span>{host?.firstName || "Host"}</span>
             </button>
 
@@ -372,11 +381,17 @@ const Listings = () => {
               <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 overflow-hidden z-50">
                 <div className="p-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={host.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
+                    {host.photoURL ? (
+                      <img
+                        src={host.photoURL}
+                        alt="profile"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                        {(host.firstName || host.email || "H").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-800 font-semibold text-sm">
                         {host.firstName || "Host"}
@@ -426,8 +441,9 @@ const Listings = () => {
 
             <button
               onClick={handleLogout}
-              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90"
+              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90 flex items-center justify-center gap-2"
             >
+              <LogOut className="w-4 h-4" />
               Logout
             </button>
           </div>
@@ -446,21 +462,33 @@ const Listings = () => {
       {/* Main Content */}
       <main className="flex-1 px-4 sm:px-8 md:px-16 py-6 md:py-10 md:ml-[260px]">
         {/* Tab Switcher */}
-        <div className="flex justify-center mb-6 sm:mb-10 overflow-x-auto">
-          <div className="flex gap-0 flex-nowrap">
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex gap-2 p-1.5 bg-gray-100 rounded-xl shadow-sm">
             <button
               onClick={() => setActiveTab("listings")}
-              className={`px-4 sm:px-6 py-2 rounded-l-md font-medium transition ${activeTab === "listings" ? "bg-[#FF5A1F] text-white" : "bg-gray-300 text-[#23364A]"
-                }`}
+              className={`px-6 sm:px-8 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === "listings" 
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-200" 
+                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+              }`}
             >
-              Listings
+              <span className="flex items-center gap-2">
+                <Clipboard className="w-4 h-4" />
+                Listings
+              </span>
             </button>
             <button
               onClick={() => setActiveTab("drafts")}
-              className={`px-4 sm:px-6 py-2 rounded-r-md font-medium transition ${activeTab === "drafts" ? "bg-[#FF5A1F] text-white" : "bg-gray-300 text-[#23364A]"
-                }`}
+              className={`px-6 sm:px-8 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === "drafts" 
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-200" 
+                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+              }`}
             >
-              Drafts
+              <span className="flex items-center gap-2">
+                <Home className="w-4 h-4" />
+                Drafts
+              </span>
             </button>
           </div>
         </div>
@@ -469,10 +497,13 @@ const Listings = () => {
         <div className="flex flex-col gap-3 mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
             <div className="flex-1 min-w-0">
-              <h2 className="text-2xl sm:text-[28px] font-bold mb-1">
+              <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
+                  <Clipboard className="w-7 h-7" />
+                </span>
                 {activeTab === "listings" ? "Your Listings" : "Your Drafts"}
               </h2>
-              <p className="text-[#5E6282] text-base sm:text-lg">
+              <p className="text-[#5E6282] text-base sm:text-lg mb-8">
                 {activeTab === "listings"
                   ? "Manage and view all your listings here."
                   : "View and edit your draft listings here."}

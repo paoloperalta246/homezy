@@ -22,7 +22,7 @@ import cresmont from "./images/cresmont.png";
 import greenbelt from "./images/greenbelt.png";
 import rise from "./images/rise.png";
 import mountain from "./images/mountain.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Menu, X } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Menu, X, Bell } from "lucide-react";
 
 export default function Homepage() {
   const [scrolled, setScrolled] = useState(false);
@@ -144,6 +144,16 @@ export default function Homepage() {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-white" />
+              </button>
+            )}
+
             {/* 👤 Profile Dropdown */}
             <div className="relative flex-shrink-0"> {/* ✅ flex-shrink-0 lets button grow */}
               <button
@@ -155,11 +165,17 @@ export default function Homepage() {
               >
                 {user ? (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span className="whitespace-nowrap overflow-visible">{user.displayName || "User"}</span>
                     {/* ✅ overflow-visible ensures full name shows */}
                   </>
@@ -179,11 +195,17 @@ export default function Homepage() {
               {user && dropdownOpen && (
                 <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 overflow-visible z-[9999]">
                   <div className="p-3 border-b border-gray-100 flex items-center gap-3">
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       {/* ✅ allows text to expand without being cut */}
                       <p className="text-gray-800 font-semibold text-sm break-words">
@@ -272,6 +294,9 @@ export default function Homepage() {
 
               {user ? (
                 <>
+                  <Link to="/guest-notifications" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link to="/guest-profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
                     <User className="w-4 h-4 text-orange-500" /> Profile
                   </Link>

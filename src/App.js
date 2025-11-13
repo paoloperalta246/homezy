@@ -25,7 +25,11 @@ import Coupons from './components/Host View/Coupons';
 import GuestMessages from './components/Guest View/GuestMessages';
 import HostMessage from './components/Host View/HostMessages';
 import PointsRewards from './components/Host View/PointsRewards';
+import Earnings from './components/Host View/Earnings';
 import Compliance from './components/Guest View/Compliance';
+import AdminDashboard from './components/Admin View/AdminDashboard';
+import HostNotifications from './components/Host View/HostNotifications';
+import GuestNotifications from './components/Guest View/GuestNotifications';
 
 function App() {
   return (
@@ -56,7 +60,11 @@ function App() {
         <Route path="/guest-messages" element={<GuestMessages />} />
         <Route path="/host-messages" element={<HostMessage />} />
         <Route path="/points-rewards" element={<PointsRewards />} />
+        <Route path="/earnings" element={<Earnings />} />
         <Route path="/compliance" element={<Compliance />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/host-notifications" element={<HostNotifications />} />
+        <Route path="/guest-notifications" element={<GuestNotifications />} />
       </Routes>
     </Router>
   );

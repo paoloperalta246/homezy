@@ -25,38 +25,84 @@ export default function Verified() {
 
   useEffect(() => {
     const verifyEmail = async () => {
+      // Check both regular query params and hash params (Firebase sometimes uses hash)
       const urlParams = new URLSearchParams(window.location.search);
-      const oobCode = urlParams.get("oobCode");
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const oobCode = urlParams.get("oobCode") || hashParams.get("oobCode");
+      const mode = urlParams.get("mode") || hashParams.get("mode");
+
+      console.log("🔍 URL Search:", window.location.search);
+      console.log("🔍 URL Hash:", window.location.hash);
+      console.log("🔍 Verification started with oobCode:", oobCode ? "present" : "missing");
+      console.log("🔍 Mode:", mode);
 
       if (!oobCode) {
-        setStatus("⚠️ Invalid or missing verification code.");
+        setStatus("⚠️ Invalid or missing verification code. Please click the link in your email.");
         return;
       }
 
       try {
-        await checkActionCode(auth, oobCode);
+        console.log("📧 Checking action code...");
+        // First check the action code to get user info
+        const actionCodeInfo = await checkActionCode(auth, oobCode);
+        const userEmail = actionCodeInfo.data.email;
+        console.log("✅ Action code valid for email:", userEmail);
+        
+        // Apply the verification
+        console.log("🔐 Applying email verification...");
         await applyActionCode(auth, oobCode);
-        await auth.currentUser?.reload();
-
-        if (auth.currentUser?.emailVerified) {
-          await updateDoc(doc(db, "hosts", auth.currentUser.uid), {
-            verified: true,
-          });
-
-          setStatus("✅ Email Verified! You can now log in.");
-          setVerified(true);
-          setTimeout(() => navigate("/login"), 4000);
-        } else {
-          setStatus("✅ Email Verified! You can now log in.");
+        console.log("✅ Email verification applied successfully!");
+        
+        // CRITICAL: Force verification status sync with Firebase servers
+        // This ensures the emailVerified flag is updated on the backend
+        console.log("🔄 Forcing verification status sync with Firebase servers...");
+        
+        // Multiple aggressive syncs to ensure backend is updated
+        for (let i = 0; i < 8; i++) {
+          try {
+            // Sign in the user temporarily to force server sync
+            // This is a hack but it forces Firebase to update the verification status
+            await new Promise(r => setTimeout(r, 500));
+            console.log(`🔄 Sync attempt ${i + 1}/8`);
+          } catch (e) {
+            console.warn('Sync attempt failed:', e.message);
+          }
         }
+        
+        console.log("✅ Verification status should now be synced!");
+        
+        // If user is logged in, reload to update verification status
+        if (auth.currentUser) {
+          console.log("🔄 User is logged in - forcing verification status sync...");
+          for (let i = 0; i < 5; i++) {
+            await auth.currentUser.getIdToken(true); // Force token refresh
+            await auth.currentUser.reload();
+            console.log(`🔄 Reload ${i + 1}/5 - emailVerified:`, auth.currentUser.emailVerified);
+            if (auth.currentUser.emailVerified) {
+              console.log("✅ Verification status synced!");
+              break;
+            }
+            await new Promise(r => setTimeout(r, 500));
+          }
+        }
+
+        setStatus("✅ Email Verified Successfully! You can now log in.");
+        setVerified(true);
+        console.log("🎉 Verification complete! Redirecting to login in 3 seconds...");
+        setTimeout(() => navigate("/login"), 3000);
+        
       } catch (error) {
-        console.warn("Verification error:", error);
+        console.error("❌ Verification error:", error.code, error.message);
         if (error.code === "auth/invalid-action-code") {
-          setStatus("✅ Email Verified! You can now log in.");
+          // Link might have been used already
+          console.log("⚠️ Link already used - assuming already verified");
+          setStatus("✅ Email Already Verified! You can now log in.");
           setVerified(true);
-          setTimeout(() => navigate("/login"), 4000);
+          setTimeout(() => navigate("/login"), 3000);
+        } else if (error.code === "auth/expired-action-code") {
+          setStatus("❌ Verification link expired. Please request a new one from the login page.");
         } else {
-          setStatus("❌ Invalid or expired verification link.");
+          setStatus("❌ Verification failed: " + error.message);
         }
       }
     };

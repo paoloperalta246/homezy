@@ -14,7 +14,7 @@ import {
 import { auth, db } from "../../firebase";
 import homezyLogo from "./images/homezy-logo.png";
 import defaultProfile from "./images/default-profile.png";
-import { Home, Clipboard, MessageSquare, Calendar, User, Gift, Ticket } from "lucide-react";
+import { Home, Clipboard, MessageSquare, Calendar, User, Gift, Ticket, DollarSign, Bell, LogOut } from "lucide-react";
 
 const Profile = () => {
   const [host, setHost] = useState(null);
@@ -193,11 +193,14 @@ const Profile = () => {
               <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
             </div>
             <nav className="flex flex-col mt-4">
+              {getNavItem("/host-notifications", "Notifications", Bell)}
+              <div className="border-t border-gray-300 my-4 mx-6"></div>
               {getNavItem("/dashboard", "Dashboard", Home)}
               {getNavItem("/listings", "My Listings", Clipboard)}
               {getNavItem("/host-messages", "Messages", MessageSquare)}
               {getNavItem("/calendar", "Calendar", Calendar)}
               {getNavItem("/points-rewards", "Points & Rewards", Gift)}
+              {getNavItem("/earnings", "Earnings", DollarSign)}
             </nav>
           </div>
 
@@ -212,11 +215,17 @@ const Profile = () => {
               }
               className="flex items-center justify-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-medium hover:bg-gray-300 transition w-full"
             >
-              <img
-                src={host?.photoURL || defaultProfile}
-                alt="profile"
-                className="w-6 h-6 rounded-full object-cover"
-              />
+              {host?.photoURL ? (
+                <img
+                  src={host.photoURL}
+                  alt="profile"
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                  {(host?.firstName || host?.email || "H").charAt(0).toUpperCase()}
+                </div>
+              )}
               <span>{host?.firstName || "Host"}</span>
             </button>
 
@@ -224,11 +233,17 @@ const Profile = () => {
               <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 overflow-hidden z-50">
                 <div className="p-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={host.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
+                    {host.photoURL ? (
+                      <img
+                        src={host.photoURL}
+                        alt="profile"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                        {(host.firstName || host.email || "H").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-800 font-semibold text-sm">
                         {host.firstName || "Host"}
@@ -278,8 +293,9 @@ const Profile = () => {
 
             <button
               onClick={handleLogout}
-              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90"
+              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90 flex items-center justify-center gap-2"
             >
+              <LogOut className="w-4 h-4" />
               Logout
             </button>
           </div>
@@ -297,8 +313,13 @@ const Profile = () => {
       {/* Main Content */}
 <main className="flex-1 px-4 sm:px-8 md:px-16 py-12 md:ml-[260px]">
   <div className="max-w-3xl mx-auto bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-gray-200">
-    <h2 className="text-2xl sm:text-3xl font-bold mb-2">Profile Settings</h2>
-    <p className="text-gray-500 mb-8 text-sm sm:text-base">
+    <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
+      <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
+        <User className="w-7 h-7" />
+      </span>
+      Profile Settings
+    </h2>
+    <p className="text-[#5E6282] text-base sm:text-lg mb-8">
       Update your personal information and account preferences.
     </p>
 
@@ -307,11 +328,23 @@ const Profile = () => {
         {/* Profile Picture */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <div className="relative">
-            <img
-              src={profilePicFile ? URL.createObjectURL(profilePicFile) : host.photoURL || defaultProfile}
-              alt="profile"
-              className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-gray-300"
-            />
+            {profilePicFile ? (
+              <img
+                src={URL.createObjectURL(profilePicFile)}
+                alt="profile"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-gray-300"
+              />
+            ) : host.photoURL ? (
+              <img
+                src={host.photoURL}
+                alt="profile"
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-gray-300"
+              />
+            ) : (
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-4xl border-2 border-gray-300 flex-shrink-0">
+                {(host.firstName || host.email || "H").charAt(0).toUpperCase()}
+              </div>
+            )}
             <label
               htmlFor="profilePic"
               className="absolute bottom-0 right-0 bg-[#FF5A1F] text-white rounded-full p-2 cursor-pointer hover:opacity-90 shadow-md"

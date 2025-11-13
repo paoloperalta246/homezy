@@ -6,7 +6,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import logo from "./homezy-logo.png";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell } from "lucide-react";
 
 const Favorites = () => {
   const [user, setUser] = useState(null);
@@ -158,6 +158,16 @@ const Favorites = () => {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
             {/* 👤 User Dropdown */}
             <div className="relative">
               <button
@@ -184,11 +194,17 @@ const Favorites = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -210,11 +226,17 @@ const Favorites = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -313,6 +335,13 @@ const Favorites = () => {
 
               {user ? (
                 <>
+                  <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}

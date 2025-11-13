@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { auth, db } from "../../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { getEmailEndpoint } from "../../utils/api";
 import {
   collection,
   addDoc,
@@ -14,10 +15,12 @@ import {
   doc,
   getDoc,
   orderBy,
-  serverTimestamp
+  serverTimestamp,
+  updateDoc
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Users, CreditCard, XCircle, Star } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Users, CreditCard, XCircle, Star, Bell } from "lucide-react";
+import { getEmailEndpoint, postJson } from '../../utils/api';
 
 const Bookings = () => {
   const location = useLocation();
@@ -57,10 +60,12 @@ const Bookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancelBookingId, setCancelBookingId] = useState(null);
+  const [pendingCancellations, setPendingCancellations] = useState(new Set());
   const [reviews, setReviews] = useState([]);
   const [leaveReviewBookingId, setLeaveReviewBookingId] = useState(null);
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
+  const [deleteReviewId, setDeleteReviewId] = useState(null);
 
   // Search handler
   const handleSearch = () => {
@@ -141,10 +146,11 @@ const Bookings = () => {
       try {
         const q = query(
           collection(db, "bookings"),
-          where("userId", "==", user.uid)
+          where("userId", "==", user.uid),
+          where("status", "in", ["confirmed", "approved", "accepted"]) // ✅ Only show confirmed/approved/accepted
         );
         const querySnapshot = await getDocs(q);
-        const fetchedBookings = querySnapshot.docs.map(doc => ({
+        const fetchedBookings = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
@@ -349,6 +355,16 @@ const Bookings = () => {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
             {/* 👤 User Dropdown */}
             <div className="relative">
               <button
@@ -375,11 +391,17 @@ const Bookings = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -401,11 +423,17 @@ const Bookings = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -504,6 +532,13 @@ const Bookings = () => {
 
               {user ? (
                 <>
+                  <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}
@@ -701,9 +736,25 @@ const Bookings = () => {
                         <CreditCard className="w-5 h-5 text-gray-400" />
                         <span className="text-sm text-gray-500">Total</span>
                       </div>
-                      <p className="font-bold text-gray-800 text-2xl">
-                        ₱{booking.price.toLocaleString()}.00
-                      </p>
+                      <div className="text-right">
+                        {booking.couponUsed && booking.discount > 0 ? (
+                          <>
+                            <p className="text-sm text-gray-400 line-through">
+                              ₱{booking.price.toLocaleString()}.00
+                            </p>
+                            <p className="font-bold text-gray-800 text-2xl">
+                              ₱{(booking.finalPrice || booking.price).toLocaleString()}.00
+                            </p>
+                            <p className="text-xs text-green-600 font-medium">
+                              Saved ₱{booking.discount.toLocaleString()} with {booking.couponUsed.code}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-bold text-gray-800 text-2xl">
+                            ₱{booking.price.toLocaleString()}.00
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex gap-3 mt-2">
@@ -714,18 +765,7 @@ const Bookings = () => {
                           // 🔴 If review exists, show Delete button
                           return (
                             <button
-                              onClick={async () => {
-                                if (!window.confirm("Are you sure you want to delete your review?")) return;
-
-                                try {
-                                  await deleteDoc(doc(db, "reviews", existingReview.id));
-                                  setReviews(reviews.filter(r => r.id !== existingReview.id));
-                                  alert("✅ Review Deleted Successfully!");
-                                } catch (err) {
-                                  console.error("Error deleting review:", err);
-                                  alert("❌ Failed to delete review.");
-                                }
-                              }}
+                              onClick={() => setDeleteReviewId({ reviewId: existingReview.id, bookingId: booking.id })}
                               className="w-auto px-4 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap"
                             >
                               <XCircle className="w-5 h-5" />
@@ -748,13 +788,30 @@ const Bookings = () => {
                       })()}
 
                       {booking.paymentStatus.toLowerCase() === "completed" && (
-                        <button
-                          onClick={() => setCancelBookingId(booking.id)}
-                          className="w-auto px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap"
-                        >
-                          <XCircle className="w-5 h-5" />
-                          Cancel Booking
-                        </button>
+                        <>
+                          {booking.cancellationStatus === 'pending' ? (
+                            <div className="px-4 py-2.5 bg-yellow-100 border border-yellow-400 text-yellow-800 text-sm font-semibold rounded-xl flex items-center justify-center gap-2">
+                              <span className="animate-pulse">⏳</span>
+                              Awaiting Host Approval
+                            </div>
+                          ) : booking.cancellationStatus === 'rejected' ? (
+                            <button
+                              onClick={() => setCancelBookingId(booking.id)}
+                              className="w-auto px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap"
+                            >
+                              <XCircle className="w-5 h-5" />
+                              Request Cancellation Again
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setCancelBookingId(booking.id)}
+                              className="w-auto px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all duration-200 whitespace-nowrap"
+                            >
+                              <XCircle className="w-5 h-5" />
+                              Cancel Booking
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -764,104 +821,207 @@ const Bookings = () => {
 
             {/* Cancel Confirmation Modal */}
             {cancelBookingId && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl p-8 w-full max-w-md text-center shadow-2xl animate-in zoom-in duration-200">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <XCircle className="w-8 h-8 text-red-500" />
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full text-center transform animate-in zoom-in duration-200">
+                  {/* Warning Icon */}
+                  <div className="mb-6 flex justify-center">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                      <XCircle className="w-10 h-10 text-red-500" />
+                    </div>
                   </div>
 
-                  <h3 className="text-2xl font-bold text-gray-800 mb-3">Cancel Booking?</h3>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Cancel This Booking?</h2>
                   <p className="text-gray-600 mb-8 leading-relaxed">
-                    Are you sure you want to cancel this booking? This action cannot be undone and you may be subject to cancellation fees.
+                    Are you absolutely sure you want to cancel this booking? <br />
+                    <span className="text-red-500 font-semibold">This action cannot be undone.</span>
                   </p>
 
-                  <div className="flex flex-col sm:flex-row justify-center gap-3">
+                  <div className="flex gap-4">
+                    {/* NO button */}
                     <button
                       onClick={() => setCancelBookingId(null)}
-                      className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+                      className="flex-1 px-6 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                     >
                       Keep Booking
                     </button>
 
+                    {/* YES button */}
                     <button
                       onClick={async () => {
                         try {
-                          // 🔹 Find the booking being cancelled
                           const cancelledBooking = bookings.find((b) => b.id === cancelBookingId);
                           if (!cancelledBooking) throw new Error("Booking not found");
 
-                          // 🔹 Fetch guest data from Firestore
-                          const userDoc = await getDoc(doc(db, "guests", cancelledBooking.userId));
-                          const guestData = userDoc.exists() ? userDoc.data() : {};
-                          const guestEmail = guestData.email;
-                          const guestFullName = guestData.fullName || "there"; // fallback if fullName missing
+                          // Check if booking has cancellationStatus
+                          if (cancelledBooking.cancellationStatus === 'approved') {
+                            // Host approved - proceed with cancellation
+                            await deleteDoc(doc(db, "bookings", cancelBookingId));
+                            setBookings(bookings.filter((b) => b.id !== cancelBookingId));
+                            setCancelBookingId(null);
 
-                          if (!guestEmail) throw new Error("Guest email not found");
+                            // Send cancellation email
+                            const guestDoc = await getDoc(doc(db, "guests", cancelledBooking.userId));
+                            const guestData = guestDoc.exists() ? guestDoc.data() : {};
+                            const guestEmail = guestData.email || "";
+                            const guestName = guestData.fullName || "Guest";
 
-                          // 🔹 Delete booking in Firestore
-                          await deleteDoc(doc(db, "bookings", cancelBookingId));
-                          setBookings((prev) => prev.filter((b) => b.id !== cancelBookingId));
-                          setCancelBookingId(null);
-                          alert("✅ Booking Cancelled Successfully!");
+                            const safeCheckIn = cancelledBooking.checkIn?.seconds
+                              ? new Date(cancelledBooking.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                              : cancelledBooking.checkIn || "Not specified";
 
-                          // 🔹 Prepare data
-                          const safeCheckIn = cancelledBooking.checkIn?.seconds
-                            ? new Date(cancelledBooking.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                            : cancelledBooking.checkIn || "Not specified";
+                            const safeCheckOut = cancelledBooking.checkOut?.seconds
+                              ? new Date(cancelledBooking.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                              : cancelledBooking.checkOut || "Not specified";
 
-                          const safeCheckOut = cancelledBooking.checkOut?.seconds
-                            ? new Date(cancelledBooking.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                            : cancelledBooking.checkOut || "Not specified";
+                            const totalGuests = cancelledBooking.guests
+                              ? (cancelledBooking.guests.adults || 0) +
+                              (cancelledBooking.guests.children || 0) +
+                              (cancelledBooking.guests.infants || 0) +
+                              (cancelledBooking.guests.pets || 0)
+                              : 1;
 
-                          const totalGuests = cancelledBooking.guests
-                            ? (cancelledBooking.guests.adults || 0) +
-                            (cancelledBooking.guests.children || 0) +
-                            (cancelledBooking.guests.infants || 0) +
-                            (cancelledBooking.guests.pets || 0)
-                            : 1;
+                            const price = cancelledBooking.price || 0;
 
-                          // // 🔹 Send cancellation email (POST request)
-                          // const response = await fetch("http://localhost:4000/send-cancellation", {
-                          //   method: "POST",
-                          //   headers: { "Content-Type": "application/json" },
-                          //   body: JSON.stringify({
-                          //     email: guestEmail,
-                          //     fullName: guestFullName,
-                          //     listingTitle: cancelledBooking.listingTitle || "Booking",
-                          //     checkIn: safeCheckIn,
-                          //     checkOut: safeCheckOut,
-                          //     guests: totalGuests,
-                          //     price: cancelledBooking.price || 0,
-                          //   }),
-                          // });
+                            await fetch(getEmailEndpoint('cancellation'), {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                email: guestEmail,
+                                fullName: guestName,
+                                listingTitle: cancelledBooking.listingTitle,
+                                checkIn: safeCheckIn,
+                                checkOut: safeCheckOut,
+                                guests: totalGuests,
+                                price,
+                              }),
+                            });
 
-                          const response = await fetch("/.netlify/functions/sendCancellation", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              email: guestEmail,
-                              fullName: guestFullName,
-                              listingTitle: cancelledBooking.listingTitle || "Booking",
-                              checkIn: safeCheckIn,
-                              checkOut: safeCheckOut,
+                            alert("✅ Booking cancelled and email sent successfully!");
+                          } else {
+                            // Send cancellation request to host
+                            await updateDoc(doc(db, "bookings", cancelBookingId), {
+                              cancellationRequested: true,
+                              cancellationStatus: 'pending',
+                              cancellationRequestedAt: serverTimestamp()
+                            });
+
+                            // Calculate total guests
+                            const totalGuests = cancelledBooking.guests
+                              ? (cancelledBooking.guests.adults || 0) +
+                              (cancelledBooking.guests.children || 0) +
+                              (cancelledBooking.guests.infants || 0) +
+                              (cancelledBooking.guests.pets || 0)
+                              : 1;
+
+                            // Create notification for host
+                            const hostNotifData = {
+                              hostId: cancelledBooking.hostId,
+                              type: "cancellation_request",
+                              title: "Cancellation Request",
+                              message: `${cancelledBooking.guestName} has requested to cancel their booking for "${cancelledBooking.listingTitle}".`,
+                              guestName: cancelledBooking.guestName,
+                              guestEmail: cancelledBooking.guestEmail,
+                              listingTitle: cancelledBooking.listingTitle,
+                              bookingId: cancelBookingId,
+                              checkIn: cancelledBooking.checkIn,
+                              checkOut: cancelledBooking.checkOut,
                               guests: totalGuests,
-                              price: cancelledBooking.price || 0,
-                            }),
-                          });
+                              finalPrice: cancelledBooking.price || cancelledBooking.finalPrice || 0,
+                              read: false,
+                              processed: false,
+                              timestamp: serverTimestamp(),
+                            };
+                            await addDoc(collection(db, "notifications"), hostNotifData);
 
-                          const data = await response.json();
-                          console.log("✅ Cancellation Email Response:", data);
-
+                            // Update local state
+                            setPendingCancellations(prev => new Set([...prev, cancelBookingId]));
+                            setCancelBookingId(null);
+                            alert("✅ Cancellation request sent! Awaiting host approval.");
+                          }
                         } catch (err) {
-                          console.error("❌ Failed to cancel booking or send email:", err);
-                          alert("❌ Failed to cancel booking or send email.");
+                          console.error("❌ Failed to process cancellation:", err);
+                          alert("❌ Failed to process cancellation. Try again later.");
                         }
                       }}
-                      className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                      className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
                     >
-                      Yes, Cancel
+                      Yes, Cancel It
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Delete Review Confirmation Modal */}
+            {deleteReviewId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full text-center transform animate-in zoom-in duration-200">
+                  {/* Warning Icon */}
+                  <div className="mb-6 flex justify-center">
+                    <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center">
+                      <XCircle className="w-10 h-10 text-teal-600" />
+                    </div>
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Delete Your Review?</h2>
+                  <p className="text-gray-600 mb-8 leading-relaxed">
+                    Are you sure you want to delete this review? <br />
+                    <span className="text-teal-600 font-semibold">This action cannot be undone.</span>
+                  </p>
+
+                  <div className="flex gap-4">
+                    {/* Cancel button */}
+                    <button
+                      onClick={() => setDeleteReviewId(null)}
+                      className="flex-1 px-6 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      Keep Review
                     </button>
 
+                    {/* Delete button */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const booking = bookings.find(b => b.id === deleteReviewId.bookingId);
+                          if (!booking) throw new Error("Booking not found");
+
+                          // Fetch listing to get hostId before deleting review
+                          const listingDoc = await getDoc(doc(db, "listings", booking.listingId));
+                          const listingData = listingDoc.exists() ? listingDoc.data() : {};
+                          const hostId = listingData.hostId;
+
+                          await deleteDoc(doc(db, "reviews", deleteReviewId.reviewId));
+                          setReviews(reviews.filter(r => r.id !== deleteReviewId.reviewId));
+
+                          // ✅ Deduct points from host when review is deleted
+                          if (hostId) {
+                            try {
+                              const { addPoints } = await import('../../utils/points');
+                              const pointsDeducted = -50; // Deduct 50 points
+                              await addPoints(hostId, pointsDeducted, 'review_deleted', {
+                                listingId: booking.listingId,
+                                listingName: listingData.title || "Unknown Listing",
+                                guestId: user.uid,
+                              });
+                              console.log(`✅ Deducted 50 points from host ${hostId} for review deletion`);
+                            } catch (pointsError) {
+                              console.error("Failed to deduct points from host:", pointsError);
+                              // Don't fail the review deletion if points fail
+                            }
+                          }
+
+                          setDeleteReviewId(null);
+                          alert("✅ Review Deleted Successfully!");
+                        } catch (err) {
+                          console.error("Error deleting review:", err);
+                          alert("❌ Failed to delete review.");
+                          setDeleteReviewId(null);
+                        }
+                      }}
+                      className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold hover:from-teal-600 hover:to-cyan-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      Yes, Delete It
+                    </button>
                   </div>
                 </div>
               </div>
@@ -921,10 +1081,11 @@ const Bookings = () => {
                           const booking = bookings.find(b => b.id === leaveReviewBookingId);
                           if (!booking) throw new Error("Booking not found");
 
-                          // ✅ Fetch listing info to get the name/title
+                          // ✅ Fetch listing info to get the name/title and hostId
                           const listingDoc = await getDoc(doc(db, "listings", booking.listingId));
                           const listingData = listingDoc.exists() ? listingDoc.data() : {};
                           const listingName = listingData.title || "Unknown Listing";
+                          const hostId = listingData.hostId;
 
                           // Add review to Firestore
                           await addDoc(collection(db, "reviews"), {
@@ -937,6 +1098,25 @@ const Bookings = () => {
                             comment: reviewText,
                             timestamp: serverTimestamp(), // proper timestamp for sorting
                           });
+
+                          // ✅ Award points to the host for receiving a review
+                          if (hostId) {
+                            try {
+                              const { addPoints } = await import('../../utils/points');
+                              const pointsAwarded = 50; // 50 points per review
+                              await addPoints(hostId, pointsAwarded, 'review_received', {
+                                listingId: booking.listingId,
+                                listingName,
+                                guestId: user.uid,
+                                guestName,
+                                rating: reviewRating,
+                              });
+                              console.log(`✅ Awarded ${pointsAwarded} points to host ${hostId} for receiving a review`);
+                            } catch (pointsError) {
+                              console.error("Failed to award points to host:", pointsError);
+                              // Don't fail the review submission if points fail
+                            }
+                          }
 
                           alert("✅ Review Submitted Successfully!");
 

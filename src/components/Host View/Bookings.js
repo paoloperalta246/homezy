@@ -5,7 +5,7 @@ import { doc, getDoc, getDocs, collection, query, where } from "firebase/firesto
 import { auth, db } from "../../firebase"; // ✅ Import your Firebase config
 import homezyLogo from "./images/homezy-logo.png";
 import defaultProfile from "./images/default-profile.png"; // ✅ Add this image
-import { Home, Clipboard, User, Gift, MessageSquare, Calendar, Ticket, Users, CreditCard, XCircle } from "lucide-react";
+import { Home, Clipboard, User, Gift, MessageSquare, Calendar, Ticket, Users, CreditCard, XCircle, DollarSign, Bell, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const HostBookings = () => {
@@ -30,6 +30,19 @@ const HostBookings = () => {
     return d;
   };
 
+  const todayBookings = bookings.filter(
+    (b) =>
+      b.status === 'confirmed' &&
+      normalizeDate(b.checkIn) <= today &&
+      normalizeDate(b.checkOut) >= today
+  );
+
+  const upcomingBookings = bookings.filter(
+    (b) => 
+      b.status === 'confirmed' &&
+      normalizeDate(b.checkIn) > today
+  );
+
   const BookingCard = ({ booking }) => (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 overflow-hidden w-full group">
       {/* Thumbnail */}
@@ -44,7 +57,7 @@ const HostBookings = () => {
 
       {/* Info Section */}
       <div className="p-6">
-        <h3 className="font-bold text-gray-800 text-xl mb-4 line-clamp-1">
+        <h3 className="font-bold text-gray-800 text-xl mb-4">
           {booking.listingTitle}
         </h3>
 
@@ -261,11 +274,14 @@ const HostBookings = () => {
               <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
             </div>
             <nav className="flex flex-col mt-4">
+              {getNavItem("/host-notifications", "Notifications", Bell)}
+              <div className="border-t border-gray-300 my-4 mx-6"></div>
               {getNavItem("/dashboard", "Dashboard", Home)}
               {getNavItem("/listings", "My Listings", Clipboard)}
               {getNavItem("/host-messages", "Messages", MessageSquare)}
               {getNavItem("/calendar", "Calendar", Calendar)}
               {getNavItem("/points-rewards", "Points & Rewards", Gift)}
+              {getNavItem("/earnings", "Earnings", DollarSign)}
             </nav>
           </div>
 
@@ -280,11 +296,17 @@ const HostBookings = () => {
               }
               className="flex items-center justify-center gap-2 bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-medium hover:bg-gray-300 transition w-full"
             >
-              <img
-                src={host?.photoURL || defaultProfile}
-                alt="profile"
-                className="w-6 h-6 rounded-full object-cover"
-              />
+              {host?.photoURL ? (
+                <img
+                  src={host.photoURL}
+                  alt="profile"
+                  className="w-6 h-6 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                  {(host?.firstName || host?.email || "H").charAt(0).toUpperCase()}
+                </div>
+              )}
               <span>{host?.firstName || "Host"}</span>
             </button>
 
@@ -292,11 +314,17 @@ const HostBookings = () => {
               <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-2xl shadow-xl ring-1 ring-gray-200 overflow-hidden z-50">
                 <div className="p-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={host.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                    />
+                    {host.photoURL ? (
+                      <img
+                        src={host.photoURL}
+                        alt="profile"
+                        className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                        {(host.firstName || host.email || "H").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-800 font-semibold text-sm">
                         {host.firstName || "Host"}
@@ -346,8 +374,9 @@ const HostBookings = () => {
 
             <button
               onClick={handleLogout}
-              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90"
+              className="bg-[#B50000] text-white font-medium py-2 w-full rounded-md hover:opacity-90 flex items-center justify-center gap-2"
             >
+              <LogOut className="w-4 h-4" />
               Logout
             </button>
           </div>
@@ -364,63 +393,162 @@ const HostBookings = () => {
 
       {/* ===== Main Content ===== */}
       <main className="flex-1 px-4 sm:px-8 md:px-16 py-10 md:ml-[260px]">
-        {/* Header */}
-        <div className="mb-6">
-          <h2 className="text-2xl sm:text-[28px] font-bold mb-2">Bookings</h2>
-          <p className="text-[#5E6282] text-base sm:text-lg">
-            Your complete overview of guest stays and booking details.
-          </p>
-        </div>
-
-        {/* Search Bar - Right Aligned */}
-        <div className="flex justify-end mb-6 w-full">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-            <input
-              type="text"
-              placeholder="Search bookings..."
-              className="border border-gray-300 px-3 py-2 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-[#FF5A1F] outline-none text-sm sm:text-base"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') setSearchTerm(searchInput.trim()); }}
-            />
-            <div className="flex gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => setSearchTerm(searchInput.trim())}
-                className="bg-[#FF5A1F] text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 transition w-full sm:w-auto text-sm sm:text-base"
-              >
-                Search
-              </button>
-              {searchTerm && (
-                <button
-                  onClick={() => { setSearchTerm(""); setSearchInput(""); }}
-                  className="text-gray-500 hover:text-[#FF5A1F] px-2 py-2 rounded w-full sm:w-auto text-sm sm:text-base"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+        {/* Tab Switcher */}
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex gap-2 p-1.5 bg-gray-100 rounded-xl shadow-sm">
+            <button
+              onClick={() => setActiveTab("today")}
+              className={`px-6 sm:px-8 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === "today" 
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-200" 
+                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Today
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab("upcoming")}
+              className={`px-6 sm:px-8 py-2.5 rounded-lg font-semibold transition-all duration-200 ${
+                activeTab === "upcoming" 
+                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-200" 
+                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Home className="w-4 h-4" />
+                Upcoming
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* Reserve space for "Results for:" */}
-        <div className="mt-2 mb-10 min-h-[32px]">
-          {searchTerm && (
-            <span className="text-[#FF5A1F] font-bold text-xl sm:text-2xl truncate block">
-              Results for: <span className="font-extrabold">{searchTerm}</span>
-            </span>
-          )}
-        </div>
-
-        {/* Bookings Grid */}
         {loading ? (
           <p className="text-center text-gray-500 py-16 text-lg">Loading bookings...</p>
-        ) : bookings.length === 0 ? (
-          <p className="text-gray-500">No bookings found.</p>
+        ) : activeTab === "today" ? (
+          <div className="mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 w-full gap-4">
+              {/* Left side: Heading + description + reserved space */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
+                    <Home className="w-7 h-7" />
+                  </span>
+                  Today's Bookings
+                </h2>
+                <p className="text-[#5E6282] text-base sm:text-lg mb-8">Check-ins and activities happening today</p>
+
+                {/* Reserve space for "Results for:" */}
+                <div className="mt-2 mb-10 min-h-[32px]">
+                  {searchTerm && (
+                    <span className="text-[#FF5A1F] font-bold text-xl sm:text-2xl truncate block">
+                      Results for: <span className="font-extrabold">{searchTerm}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right side: Search bar */}
+              <div className="flex flex-col sm:flex-row flex-shrink-0 items-start sm:items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search bookings..."
+                  className="border border-gray-300 px-3 py-2 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-[#FF5A1F] outline-none text-sm sm:text-base"
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') setSearchTerm(searchInput.trim()); }}
+                />
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => setSearchTerm(searchInput.trim())}
+                    className="bg-[#FF5A1F] text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 transition w-full sm:w-auto text-sm sm:text-base"
+                  >
+                    Search
+                  </button>
+                  {searchTerm && (
+                    <button
+                      onClick={() => { setSearchTerm(""); setSearchInput(""); }}
+                      className="text-gray-500 hover:text-[#FF5A1F] px-2 py-2 rounded w-full sm:w-auto text-sm sm:text-base"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {todayBookings.length === 0 ? (
+              <p className="text-gray-500">No bookings for today.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {todayBookings
+                  .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {bookings
-              .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
-              .map((b) => <BookingCard key={b.id} booking={b} />)}
+          <div className="mb-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 w-full gap-4">
+              {/* Left side: Heading + description + reserved space */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
+                  <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
+                    <Home className="w-7 h-7" />
+                  </span>
+                  Upcoming Bookings
+                </h2>
+                <p className="text-[#5E6282] text-base sm:text-lg mb-8">All future reservations and scheduled stays</p>
+
+                <div className="mt-2 min-h-[32px]">
+                  {searchTerm && (
+                    <span className="text-[#FF5A1F] font-bold text-xl sm:text-2xl truncate block">
+                      Results for: <span className="font-extrabold">{searchTerm}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right side: Search bar */}
+              <div className="flex flex-col sm:flex-row flex-shrink-0 items-start sm:items-center gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search bookings..."
+                  className="border border-gray-300 px-3 py-2 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-[#FF5A1F] outline-none text-sm sm:text-base"
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') setSearchTerm(searchInput.trim()); }}
+                />
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={() => setSearchTerm(searchInput.trim())}
+                    className="bg-[#FF5A1F] text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 transition w-full sm:w-auto text-sm sm:text-base"
+                  >
+                    Search
+                  </button>
+                  {searchTerm && (
+                    <button
+                      onClick={() => { setSearchTerm(""); setSearchInput(""); }}
+                      className="text-gray-500 hover:text-[#FF5A1F] px-2 py-2 rounded w-full sm:w-auto text-sm sm:text-base"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {upcomingBookings.length === 0 ? (
+              <p className="text-gray-500">No upcoming bookings.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {upcomingBookings
+                  .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
+              </div>
+            )}
           </div>
         )}
       </main>

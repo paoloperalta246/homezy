@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Check, Shield, Star, Sparkles, ArrowRight, ArrowLeft, Lock, Users, TrendingUp } from "lucide-react";
 import logo from "./homezy-logo.png";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -6,7 +6,8 @@ import { auth, db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import axios from "axios";
-import { onAuthStateChanged, createUserWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { getEmailEndpoint } from "../../utils/api";
 
 export default function HostVerification() {
   const [formData, setFormData] = useState({
@@ -23,6 +24,9 @@ export default function HostVerification() {
   const [message, setMessage] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [createdUserUid, setCreatedUserUid] = useState(null); // Store UID after user creation
+  const onApproveRanRef = useRef(false); // Prevent PayPal onApprove double-run
+  const emailSendInFlightRef = useRef(false); // Prevent duplicate email send
   const navigate = useNavigate();
 
   // Define this at the top of your component, before the return statement
@@ -41,16 +45,20 @@ export default function HostVerification() {
 
   const createFirebaseUser = async () => {
     try {
+      console.log("🔵 Creating Firebase user account...");
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
       const user = userCredential.user;
+      const userUid = user.uid;
+      console.log("✅ User account created:", userUid);
 
       // Create initial Firestore doc
-      await setDoc(doc(db, "hosts", user.uid), {
-        uid: user.uid,
+      console.log("🔵 Creating initial Firestore document...");
+      await setDoc(doc(db, "hosts", userUid), {
+        uid: userUid,
         firstName: formData.firstName,
         lastName: formData.lastName,
         fullName: `${formData.firstName} ${formData.lastName}`.trim(),
@@ -61,9 +69,16 @@ export default function HostVerification() {
         subscriptionPrice: null,
         paymentId: null,
         paymentStatus: null,
+        verified: false, // Will be set to true after email verification
       });
+      console.log("✅ Firestore document created");
 
-      return user;
+      // ⚠️ CRITICAL: Sign out immediately to prevent Firebase from auto-sending verification email
+      console.log("🔵 Signing out user to prevent auto-verification email...");
+      await signOut(auth);
+      console.log("✅ User signed out - will only receive custom verification email");
+
+      return userUid; // Return the UID instead of user object
     } catch (err) {
       console.error("❌ Error creating user:", err);
       throw err;
@@ -442,8 +457,9 @@ export default function HostVerification() {
                       return;
                     }
 
-                    // ✅ Create Firebase user before payment
-                    await createFirebaseUser();
+                    // ✅ Create Firebase user before payment and store the UID
+                    const userUid = await createFirebaseUser();
+                    setCreatedUserUid(userUid); // Store the UID for later use
 
                     setCurrentStep(3); // now move to payment
                   } catch (err) {
@@ -551,42 +567,57 @@ export default function HostVerification() {
 
                             onApprove={async (data, actions) => {
                               try {
+                                // Prevent double execution
+                                if (onApproveRanRef.current) {
+                                  console.log("⚠️ onApprove already processed. Ignoring duplicate callback.");
+                                  return;
+                                }
+                                onApproveRanRef.current = true;
+
                                 const details = await actions.order.capture();
                                 console.log("✅ PayPal Payment Details:", details);
 
-                                // Make sure the user is actually logged in
-                                const user = await new Promise((resolve, reject) => {
-                                  const unsub = onAuthStateChanged(auth, (u) => {
-                                    unsub();
-                                    if (u) resolve(u);
-                                    else reject(new Error("User not logged in"));
-                                  });
-                                });
+                                // Use the stored UID (user was signed out after creation)
+                                if (!createdUserUid) {
+                                  throw new Error("User UID not found. Please try again.");
+                                }
 
+                                console.log("🔵 Step 1: Saving subscription to Firestore...");
                                 // ✅ Save subscription + user info in "hosts" ONLY
-                                const hostRef = doc(db, "hosts", user.uid);
-
-                                await setDoc(doc(db, "hosts", user.uid), {
+                                await setDoc(doc(db, "hosts", createdUserUid), {
                                   subscriptionPlan: plan,
                                   subscriptionPrice: priceMap[plan],
                                   paymentId: details.id,
                                   paymentStatus: details.status || "COMPLETED",
                                   updatedAt: serverTimestamp(),
 
-                                  uid: user.uid,
+                                  uid: createdUserUid,
                                   firstName: formData.firstName,
                                   lastName: formData.lastName,
                                   fullName: `${formData.firstName} ${formData.lastName}`.trim(),
-                                  email: formData.email,      // <- USE Firebase email
+                                  email: formData.email,
                                   phone: formData.phone,
                                   timestamp: new Date(),
-                                });
+                                  verified: false, // Will be set to true after email verification
+                                }, { merge: true });
+                                console.log("✅ Step 1: Subscription saved successfully");
 
+                                console.log("🔵 Step 2: Sending verification email...");
+                                if (emailSendInFlightRef.current) {
+                                  console.log("⚠️ Email send already in-flight. Skipping duplicate send.");
+                                } else {
+                                  emailSendInFlightRef.current = true;
                                 // Send verification email
-                                await axios.post("http://localhost:4000/send-verification", {
-                                  email: formData.email,      // <- USE Firebase email
+                                const emailResponse = await axios.post(getEmailEndpoint('verification'), {
+                                  email: formData.email,
                                   fullName: `${formData.firstName} ${formData.lastName}`.trim(),
                                 });
+                                
+                                if (!emailResponse.data.success) {
+                                  throw new Error("Failed to send verification email: " + (emailResponse.data.error || "Unknown error"));
+                                }
+                                console.log("✅ Step 2: Verification email sent successfully");
+                                }
 
                                 // ✅ Set message & success state
                                 setMessage(
@@ -596,9 +627,22 @@ export default function HostVerification() {
 
                               } catch (error) {
                                 console.error("❌ Payment/Subscription/Error:", error);
-                                alert(
-                                  "❌ Payment processed but failed to save subscription or send verification email. Contact support."
-                                );
+                                
+                                // Provide more specific error messages
+                                let errorMessage = "❌ Payment processed but failed to complete registration. ";
+                                if (error.message.includes("UID not found")) {
+                                  errorMessage += "User session expired. Please refresh and try again. ";
+                                } else if (error.message.includes("verification email")) {
+                                  errorMessage += "Failed to send verification email. Make sure server.js is running on port 4000. ";
+                                } else if (error.message.includes("Firestore")) {
+                                  errorMessage += "Failed to save subscription data. ";
+                                } else {
+                                  errorMessage += error.message + " ";
+                                }
+                                errorMessage += "Contact support for assistance.";
+                                
+                                alert(errorMessage);
+                                setError(errorMessage);
                               }
                             }}
 

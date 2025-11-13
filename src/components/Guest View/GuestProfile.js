@@ -6,7 +6,7 @@ import { auth, db } from "../../firebase";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell } from "lucide-react";
 
 const GuestProfile = () => {
   const location = useLocation();
@@ -197,6 +197,16 @@ const GuestProfile = () => {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
             {/* 👤 User Dropdown */}
             <div className="relative">
               <button
@@ -223,11 +233,17 @@ const GuestProfile = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -249,11 +265,17 @@ const GuestProfile = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -353,6 +375,13 @@ const GuestProfile = () => {
               {user ? (
                 <>
                   <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
+                  <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
@@ -423,15 +452,23 @@ const GuestProfile = () => {
               {/* Profile Picture */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start sm:gap-6 gap-4 text-center sm:text-left">
                 <div className="relative">
-                  <img
-                    src={
-                      profilePicFile
-                        ? URL.createObjectURL(profilePicFile)
-                        : guest.photoURL || defaultProfile
-                    }
-                    alt="profile"
-                    className="w-28 h-28 rounded-full object-cover border-2 border-gray-300 mx-auto sm:mx-0"
-                  />
+                  {profilePicFile ? (
+                    <img
+                      src={URL.createObjectURL(profilePicFile)}
+                      alt="profile"
+                      className="w-28 h-28 rounded-full object-cover border-2 border-gray-300 mx-auto sm:mx-0"
+                    />
+                  ) : guest.photoURL ? (
+                    <img
+                      src={guest.photoURL}
+                      alt="profile"
+                      className="w-28 h-28 rounded-full object-cover border-2 border-gray-300 mx-auto sm:mx-0"
+                    />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-4xl border-2 border-gray-300 mx-auto sm:mx-0 flex-shrink-0">
+                      {(guest.fullName || guest.email || "U").charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <label
                     htmlFor="profilePic"
                     className="absolute bottom-0 right-0 bg-[#FF5A1F] text-white rounded-full p-2 cursor-pointer hover:opacity-90 shadow-md"

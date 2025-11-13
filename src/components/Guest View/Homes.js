@@ -15,7 +15,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell } from "lucide-react";
 
 const Homes = () => {
   const location = useLocation();
@@ -31,10 +31,14 @@ const Homes = () => {
   // Date dropdown ref
   const dateRef = useRef(null);
 
+  // Location dropdown ref
+  const locationRef = useRef(null);
+
   const [reviews, setReviews] = useState([]);
 
   const [locations, setLocations] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
   const [guestOpen, setGuestOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -42,6 +46,8 @@ const Homes = () => {
   const [wishlist, setWishlist] = useState([]);
 
   const [allListings, setAllListings] = useState([]);
+  const [userBookings, setUserBookings] = useState([]);
+  const [suggestedListings, setSuggestedListings] = useState([]);
 
   const [searchLocation, setSearchLocation] = useState("");
   const [selectedDate, setSelectedDate] = useState(""); // only one date
@@ -76,10 +82,14 @@ const Homes = () => {
   useEffect(() => {
     const fetchLocations = async () => {
       try {
-        // Fetch all listings
-        const querySnapshot = await getDocs(collection(db, "listings"));
+        // Fetch only home listings
+        const q = query(
+          collection(db, "listings"),
+          where("category", "==", "home")
+        );
+        const querySnapshot = await getDocs(q);
 
-        // Extract unique locations
+        // Extract unique locations from home category only
         const locs = Array.from(
           new Set(querySnapshot.docs.map((doc) => doc.data().location).filter(Boolean))
         );
@@ -231,6 +241,115 @@ const Homes = () => {
     fetchListings();
   }, []);
 
+  // Fetch user's bookings and generate suggestions
+  useEffect(() => {
+    const fetchUserBookings = async () => {
+      if (!user) {
+        setUserBookings([]);
+        setSuggestedListings([]);
+        return;
+      }
+
+      try {
+        const q = query(
+          collection(db, "bookings"),
+          where("userId", "==", user.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        const bookings = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUserBookings(bookings);
+
+        // Only show suggestions if user has active bookings
+        if (bookings.length === 0) {
+          setSuggestedListings([]);
+          return;
+        }
+
+        // Generate suggestions based on bookings
+        if (allListings.length > 0) {
+          const bookedListingIds = bookings.map(b => b.listingId);
+          
+          // Extract locations from bookings (with fallback to empty array)
+          const bookedLocations = [...new Set(
+            bookings
+              .map(b => b.location)
+              .filter(loc => loc && loc.trim() !== "")
+          )];
+          
+          // Extract prices (prefer finalPrice, fallback to price)
+          const bookedPrices = bookings
+            .map(b => b.finalPrice || b.price || 0)
+            .filter(price => price > 0);
+          
+          // Calculate average price only if we have valid prices
+          const avgPrice = bookedPrices.length > 0 
+            ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length 
+            : 0;
+
+          // Number of suggestions = number of bookings (1 booking = 1 suggestion, etc.)
+          const suggestionsCount = bookings.length;
+
+          // Filter suggestions based on user history
+          let suggestions = allListings.filter(listing => {
+            // Don't suggest already booked listings
+            if (bookedListingIds.includes(listing.id)) return false;
+
+            // Check location match
+            const locationMatch = bookedLocations.length > 0 && bookedLocations.some(loc => 
+              listing.location?.toLowerCase().includes(loc?.toLowerCase())
+            );
+
+            // Check price match (±30% range) - only if we have average price
+            const priceMatch = avgPrice > 0 && 
+              listing.price >= avgPrice * 0.7 && 
+              listing.price <= avgPrice * 1.3;
+
+            // Return true if either location or price matches
+            if (bookedLocations.length > 0 && avgPrice > 0) {
+              return locationMatch || priceMatch;
+            } else if (bookedLocations.length > 0) {
+              return locationMatch;
+            } else if (avgPrice > 0) {
+              return priceMatch;
+            }
+            
+            // If no filtering criteria, include this listing
+            return true;
+          });
+
+          // If not enough personalized suggestions, add random ones to fill the gap
+          if (suggestions.length < suggestionsCount) {
+            const availableListings = allListings.filter(listing => 
+              !bookedListingIds.includes(listing.id) && 
+              !suggestions.find(s => s.id === listing.id)
+            );
+            
+            const randomSuggestions = availableListings
+              .sort(() => Math.random() - 0.5)
+              .slice(0, suggestionsCount - suggestions.length);
+            
+            suggestions = [...suggestions, ...randomSuggestions];
+          }
+
+          // Limit to exact number of bookings
+          suggestions = suggestions.slice(0, suggestionsCount);
+
+          setSuggestedListings(suggestions);
+        } else {
+          setSuggestedListings([]);
+        }
+      } catch (error) {
+        console.error("Error fetching user bookings:", error);
+        setSuggestedListings([]);
+      }
+    };
+
+    fetchUserBookings();
+  }, [user, allListings]);
+
 
   // Wishlist handler
   const handleWishlist = async (item) => {
@@ -311,6 +430,9 @@ const Homes = () => {
   // Handle click outside for dropdowns
   useEffect(() => {
     const handleClickOutside = (e) => {
+      if (locationRef.current && !locationRef.current.contains(e.target)) {
+        setLocationOpen(false);
+      }
       if (guestRef.current && !guestRef.current.contains(e.target)) {
         setGuestOpen(false);
       }
@@ -413,7 +535,17 @@ const Homes = () => {
               Become a Host
             </button>
 
-            {/* 👤 User Dropdown */}
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
+            {/* 👤 User Dropdown */ }
             <div className="relative">
               <button
                 ref={dropdownButtonRef}
@@ -439,11 +571,17 @@ const Homes = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -465,11 +603,17 @@ const Homes = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -526,10 +670,10 @@ const Homes = () => {
                   </div>
                 </DropdownPortal>
               )}
-            </div>
+            </div>            
           </div>
         </div>
-
+        
         {/* 📱 Mobile Menu Dropdown */}
         {mobileMenuOpen && (
           <div className="sm:hidden bg-white border-t border-gray-100 shadow-md">
@@ -568,6 +712,13 @@ const Homes = () => {
 
               {user ? (
                 <>
+                  <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}
@@ -624,27 +775,79 @@ const Homes = () => {
         )}
       </header>
 
-      <>
-        {/* 🔍 Enhanced Search Section */}
-        <section className="mt-10 flex justify-center px-4 sm:px-0 relative z-[50]">
+      {/* 🔍 Enhanced Search Section */}
+      <section className="mt-10 flex justify-center px-4 sm:px-0 relative z-[50]">
           <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl w-full max-w-5xl px-4 sm:px-6 py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 border border-gray-200 relative">
 
             {/* Location */}
-            <div className="flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[140px] relative z-[60]">
-              <label className="text-sm font-semibold text-gray-700">Where</label>
-              <select
-                value={searchLocation}
-                onChange={(e) => setSearchLocation(e.target.value)}
-                className="text-gray-700 text-sm mt-1 border-none bg-transparent focus:outline-none appearance-none"
+            <div ref={locationRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[140px] z-[60]">
+              <button
+                onClick={() => setLocationOpen(!locationOpen)}
+                className="w-full text-left border-none bg-transparent focus:outline-none"
               >
-                <option value="">Select location ▼</option>
-                {locations.map((loc, index) => (
-                  <option key={index} value={loc}>
-                    {loc}
-                  </option>
-                ))}
-              </select>
+                <label className="text-sm font-semibold text-gray-700 block">Where</label>
+                <span className="text-sm text-gray-700">
+                  {searchLocation 
+                    ? (searchLocation.length > 20 
+                        ? searchLocation.slice(0, 20) + "..." 
+                        : searchLocation)
+                    : "Select location ▼"}
+                </span>
+              </button>
 
+              {locationOpen && (
+                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-64 max-h-80 overflow-y-auto p-2 text-gray-800 top-full left-0">
+                  {/* Search input for filtering */}
+                  <input
+                    type="text"
+                    placeholder="Search locations..."
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                    className="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  
+                  {/* Clear option */}
+                  <button
+                    onClick={() => {
+                      setSearchLocation("");
+                      setLocationOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Clear selection
+                  </button>
+
+                  {/* Divider */}
+                  <div className="border-t border-gray-200 my-2"></div>
+
+                  {/* Location options */}
+                  {locations
+                    .filter(loc => 
+                      loc.toLowerCase().includes(searchLocation.toLowerCase())
+                    )
+                    .map((loc, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSearchLocation(loc);
+                          setLocationOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                      >
+                        📍 {loc}
+                      </button>
+                    ))}
+                  
+                  {/* No results message */}
+                  {locations.filter(loc => 
+                    loc.toLowerCase().includes(searchLocation.toLowerCase())
+                  ).length === 0 && searchLocation && (
+                    <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                      No locations found
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Single Date Picker */}
@@ -739,7 +942,25 @@ const Homes = () => {
             </div>
           </div>
         </section>
-      </>
+
+      {/* SUGGESTED FOR YOU SECTION */}
+      {user && suggestedListings.length > 0 && !isSearching && (
+        <section className="max-w-screen-xl mx-auto mt-14 mb-14 sm:mb-20 px-4 sm:px-6 lg:px-6">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#0B2545]">
+              ✨ Suggested for You
+            </h2>
+            <p className="text-gray-500 text-sm sm:text-base mt-2">
+              Based on your booking history, we think you'll love these places
+            </p>
+            <div className="w-24 sm:w-32 border-b-2 border-orange-500 mx-auto mt-4"></div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
+            {suggestedListings.map((item) => renderCard(item))}
+          </div>
+        </section>
+      )}
 
       {/* LISTINGS: show two sections by default; show single section when searched */}
       {!isSearching ? (

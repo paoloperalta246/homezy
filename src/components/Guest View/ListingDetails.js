@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
-import { doc, getDoc, getDocs } from "firebase/firestore";
+import { doc, getDoc, getDocs, query, collection as fsCollection, where } from "firebase/firestore";
 import { db, auth } from "../../firebase";
 import { createPortal } from "react-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -38,7 +38,8 @@ import {
   Facebook,
   Twitter,
   Instagram,
-  UserCircle
+  UserCircle,
+  Bell
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
@@ -51,8 +52,10 @@ import iconUrl from "leaflet/dist/images/marker-icon.png";
 import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
 import shadowUrl from "leaflet/dist/images/marker-shadow.png";
 import { enUS } from 'date-fns/locale';
+import { getEmailEndpoint, postJson } from '../../utils/api';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, updateDoc, doc as fsDoc, getDoc as fsGetDoc } from "firebase/firestore";
+import { addPoints } from '../../utils/points';
 
 const ListingDetails = () => {
   const { listingId } = useParams();
@@ -113,6 +116,12 @@ const ListingDetails = () => {
   const [selectingCheckIn, setSelectingCheckIn] = useState(true);
   const calendarRef = useRef(null);
 
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+
   // -----------------------
   // ALL hooks go here (unconditional)
   // -----------------------
@@ -126,7 +135,8 @@ const ListingDetails = () => {
 
         if (docSnap.exists()) {
           // include the Firestore document id so listing.id exists later
-          setListing({ id: docSnap.id, ...docSnap.data() });
+          const listingData = { id: docSnap.id, ...docSnap.data() };
+          setListing(listingData);
           setCurrentImage(0);
         } else {
           alert("Listing not found!");
@@ -137,7 +147,27 @@ const ListingDetails = () => {
         alert("Failed to load listing.");
       }
     };
+
     fetchListing();
+
+    // Refetch when user returns to page (e.g., after cancelling booking)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchListing();
+      }
+    };
+
+    const handleFocus = () => {
+      fetchListing();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [listingId, navigate]);
 
   useEffect(() => {
@@ -163,7 +193,6 @@ const ListingDetails = () => {
     fetchReviews();
   }, [listingId]);
 
-
   // ✅ Fix default icon issue
   delete L.Icon.Default.prototype._getIconUrl;
   L.Icon.Default.mergeOptions({
@@ -181,6 +210,9 @@ const ListingDetails = () => {
       infants: 0,
       pets: 0,
     });
+    setCouponCode("");
+    setAppliedCoupon(null);
+    setCouponError("");
   };
 
 
@@ -210,6 +242,108 @@ const ListingDetails = () => {
       setCalendarOpen(false);
       setSelectingCheckIn(true);
     }
+  };
+
+  // Coupon validation and application
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError("Please enter a coupon code");
+      return;
+    }
+    if (!listing?.hostId && !listing?.ownerId) {
+      setCouponError("Host information not available");
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError("");
+
+    try {
+      const hostId = listing.hostId || listing.ownerId;
+      const q = query(
+        fsCollection(db, "coupons"),
+        where("code", "==", couponCode.toUpperCase()),
+        where("hostId", "==", hostId)
+      );
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        setCouponError("Invalid coupon code");
+        setCouponLoading(false);
+        return;
+      }
+
+      const couponDoc = snapshot.docs[0];
+      const coupon = { id: couponDoc.id, ...couponDoc.data() };
+
+      // Validate status
+      if (coupon.status !== "active") {
+        setCouponError("This coupon is no longer active");
+        setCouponLoading(false);
+        return;
+      }
+
+      // Validate usage limits (single-use)
+      if (typeof coupon.maxUses === 'number' && typeof coupon.usedCount === 'number') {
+        if (coupon.usedCount >= coupon.maxUses) {
+          setCouponError("This coupon has already been used");
+          setCouponLoading(false);
+          return;
+        }
+      }
+
+      // Validate expiration
+      if (coupon.expiresAt) {
+        const expiry = coupon.expiresAt.toDate ? coupon.expiresAt.toDate() : new Date(coupon.expiresAt);
+        if (expiry < new Date()) {
+          setCouponError("This coupon has expired");
+          setCouponLoading(false);
+          return;
+        }
+      }
+
+      // Valid coupon!
+      setAppliedCoupon(coupon);
+      setCouponError("");
+      setCouponLoading(false);
+    } catch (error) {
+      console.error("Coupon validation error:", error);
+      setCouponError("Failed to validate coupon");
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    setCouponError("");
+  };
+
+  // Calculate final price with coupon
+  const calculateFinalPrice = () => {
+    if (!listing?.price) return 0;
+    const basePrice = listing.price;
+
+    if (!appliedCoupon) return basePrice;
+
+    // enforce single-use pricing logic (if coupon somehow applied after usage)
+    if (appliedCoupon.maxUses === 1 && appliedCoupon.usedCount >= 1) {
+      return basePrice; // treat as no discount
+    }
+
+    if (appliedCoupon.discountType === "percentage") {
+      const discount = (basePrice * appliedCoupon.discountValue) / 100;
+      return Math.max(0, basePrice - discount);
+    } else if (appliedCoupon.discountType === "fixed") {
+      return Math.max(0, basePrice - appliedCoupon.discountValue);
+    }
+
+    return basePrice;
+  };
+
+  const getDiscountAmount = () => {
+    if (!listing?.price || !appliedCoupon) return 0;
+    return listing.price - calculateFinalPrice();
   };
 
   // auth listener
@@ -379,6 +513,16 @@ const ListingDetails = () => {
               Become a Host
             </button>
 
+            {/* 🔔 Notifications Bell */}
+            {user && (
+              <button
+                onClick={() => navigate("/guest-notifications")}
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Bell className="w-5 h-5 text-gray-700" />
+              </button>
+            )}
+
             {/* 👤 User Dropdown */}
             <div className="relative">
               <button
@@ -405,11 +549,17 @@ const ListingDetails = () => {
                   </>
                 ) : (
                   <>
-                    <img
-                      src={user.photoURL || defaultProfile}
-                      alt="profile"
-                      className="w-6 h-6 rounded-full object-cover"
-                    />
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt="profile"
+                        className="w-6 h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                        {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <span>{user.displayName || "User"}</span>
                   </>
                 )}
@@ -431,11 +581,17 @@ const ListingDetails = () => {
                   >
                     <div className="p-3 border-b border-gray-100">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={user.photoURL || defaultProfile}
-                          alt="profile"
-                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                        />
+                        {user.photoURL ? (
+                          <img
+                            src={user.photoURL}
+                            alt="profile"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg border border-gray-200 flex-shrink-0">
+                            {(user.displayName || user.email || "U").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="text-gray-800 font-semibold text-sm">
                             {user.displayName || "Guest User"}
@@ -534,6 +690,13 @@ const ListingDetails = () => {
 
               {user ? (
                 <>
+                  <Link
+                    to="/guest-notifications"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Bell className="w-4 h-4 text-orange-500" /> Notifications
+                  </Link>
                   <Link
                     to="/guest-profile"
                     onClick={() => setMobileMenuOpen(false)}
@@ -1312,6 +1475,72 @@ const ListingDetails = () => {
               )}
             </div>
 
+            {/* Coupon Code Input */}
+            <div className="mb-5">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                Have a coupon code?
+              </label>
+              {!appliedCoupon ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="Enter code"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <button
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading}
+                    className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition disabled:opacity-50"
+                  >
+                    {couponLoading ? "..." : "Apply"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div>
+                      <p className="text-sm font-medium text-green-800">{appliedCoupon.code}</p>
+                      <p className="text-xs text-green-600">
+                        {appliedCoupon.discountType === "percentage"
+                          ? `${appliedCoupon.discountValue}% off`
+                          : `₱${appliedCoupon.discountValue} off`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleRemoveCoupon}
+                    className="text-red-500 hover:text-red-700 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              {couponError && (
+                <p className="text-xs text-red-500 mt-1">{couponError}</p>
+              )}
+            </div>
+
+            {/* Price Summary */}
+            {appliedCoupon && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg space-y-1 text-sm">
+                <div className="flex justify-between text-gray-600">
+                  <span>Original Price:</span>
+                  <span>₱{listing.price.toLocaleString()}.00</span>
+                </div>
+                <div className="flex justify-between text-green-600 font-medium">
+                  <span>Discount:</span>
+                  <span>-₱{getDiscountAmount().toLocaleString()}.00</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold text-[#0B2545] border-t pt-2">
+                  <span>Total:</span>
+                  <span>₱{calculateFinalPrice().toLocaleString()}.00</span>
+                </div>
+              </div>
+            )}
+
             {/* 🔹 PayPal Checkout Section */}
             <div className="relative z-10 mt-3 sm:mt-4">
               <PayPalScriptProvider
@@ -1336,38 +1565,64 @@ const ListingDetails = () => {
                     return actions.resolve();
                   }}
                   createOrder={(data, actions) => {
+                    const finalPrice = calculateFinalPrice();
                     return actions.order.create({
                       purchase_units: [
                         {
                           description: listing?.title || "Booking",
                           amount: {
-                            value: listing?.price?.toString() || "0.00",
+                            value: finalPrice.toFixed(2),
                             currency_code: "PHP",
                           },
                         },
                       ],
                     });
                   }}
+
                   onApprove={async (data, actions) => {
                     try {
                       const details = await actions.order.capture();
                       console.log("✅ PayPal Payment Details:", details);
 
-                      const safeCheckIn = checkIn || "Not specified";
-                      const safeCheckOut = checkOut || "Not specified";
+                      const safeCheckIn = checkIn
+                        ? new Date(checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : "Not specified";
+
+                      const safeCheckOut = checkOut
+                        ? new Date(checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : "Not specified";
+
                       const totalGuests =
                         (guests?.adults || 0) +
                         (guests?.children || 0) +
                         (guests?.infants || 0) +
                         (guests?.pets || 0) || 1;
 
+                      const finalPrice = calculateFinalPrice();
+                      const discount = getDiscountAmount();
+                      const hostId = listing?.hostId || listing?.ownerId || "";
+
+                      // ✅ Add booking to Firestore as confirmed immediately
                       const bookingRef = await addDoc(collection(db, "bookings"), {
                         listingId: listing?.id || id || "unknown",
                         listingTitle: listing?.title || "Untitled Listing",
                         listingImage: listing?.imageUrl || listing?.images?.[0] || "",
-                        hostId: listing?.hostId || listing?.ownerId || "",
+                        location: listing?.location || "",
+                        category: listing?.category || "",
+                        hostId,
                         userId: auth.currentUser.uid,
+                        guestName: auth.currentUser.displayName || "Guest",
+                        guestEmail: auth.currentUser.email || "",
                         price: listing?.price || 0,
+                        finalPrice: finalPrice,
+                        discount: discount,
+                        couponUsed: appliedCoupon ? {
+                          code: appliedCoupon.code,
+                          discountType: appliedCoupon.discountType,
+                          discountValue: appliedCoupon.discountValue,
+                          maxUses: appliedCoupon.maxUses ?? null,
+                          usedCountAtBooking: appliedCoupon.usedCount ?? 0,
+                        } : null,
                         checkIn: checkIn ? new Date(checkIn) : null,
                         checkOut: checkOut ? new Date(checkOut) : null,
                         guests: { ...guests, total: totalGuests },
@@ -1376,47 +1631,129 @@ const ListingDetails = () => {
                           details.status ||
                           details?.purchase_units?.[0]?.payments?.captures?.[0]?.status ||
                           "completed",
+                        status: "pending", // ⏳ Awaiting host approval
                         createdAt: serverTimestamp(),
                       });
 
-                      // await fetch("http://localhost:4000/send-receipt", {
-                      //   method: "POST",
-                      //   headers: { "Content-Type": "application/json" },
-                      //   body: JSON.stringify({
-                      //     email: auth.currentUser.email,
-                      //     fullName: auth.currentUser.displayName || "",
-                      //     listingTitle: listing?.title || "Booking",
-                      //     checkIn: safeCheckIn,
-                      //     checkOut: safeCheckOut,
-                      //     guests: totalGuests,
-                      //     price: listing?.price || 0,
-                      //   }),
-                      // });
-
-                      await fetch("/.netlify/functions/sendReceipt", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          email: auth.currentUser.email,
-                          fullName: auth.currentUser.displayName || "",
-                          listingTitle: listing?.title || "Booking",
-                          checkIn: safeCheckIn,
-                          checkOut: safeCheckOut,
-                          guests: totalGuests,
-                          price: listing?.price || 0,
-                        }),
+                      // ✅ Add a notification for the host
+                      await addDoc(collection(db, "notifications"), {
+                        hostId: hostId,
+                        bookingId: bookingRef.id,
+                        type: "pending-booking",
+                        message: `New booking request from ${auth.currentUser.displayName || "Guest"} for ${listing?.title || "your listing"}`,
+                        listingTitle: listing?.title || "Untitled Listing",
+                        guestName: auth.currentUser.displayName || "Guest",
+                        guestEmail: auth.currentUser.email || "",
+                        checkIn: checkIn ? new Date(checkIn) : null,
+                        checkOut: checkOut ? new Date(checkOut) : null,
+                        guests: totalGuests,
+                        finalPrice: finalPrice || 0,
+                        read: false,
+                        timestamp: serverTimestamp(),
                       });
 
+                      // Reserve listing dates
+                      if (listing?.id && checkIn && checkOut) {
+                        try {
+                          const datesToReserve = [];
+                          const start = new Date(checkIn);
+                          const end = new Date(checkOut);
+                          let cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
+                          while (cursor < end) {
+                            const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+                            datesToReserve.push(key);
+                            cursor.setDate(cursor.getDate() + 1);
+                          }
+
+                          const listingRef = fsDoc(db, 'listings', listing.id);
+                          const listingSnap = await fsGetDoc(listingRef);
+                          if (listingSnap.exists()) {
+                            const currentReserved = listingSnap.data().reservedDates || [];
+                            const mergedReserved = [...new Set([...currentReserved, ...datesToReserve])];
+                            await updateDoc(listingRef, { reservedDates: mergedReserved });
+                          }
+                        } catch (reserveErr) {
+                          console.error('❌ Failed to reserve dates on listing:', reserveErr);
+                        }
+                      }
+
+                      // Award points to host
+                      if (hostId) {
+                        try {
+                          await addPoints(hostId, 100, 'booking', {
+                            bookingId: bookingRef.id,
+                            listingTitle: listing?.title || 'Booking',
+                            amount: listing?.price || 0
+                          });
+                        } catch (pointsErr) {
+                          console.error('❌ Failed to award points:', pointsErr);
+                        }
+                      }
+
+                      // Increment coupon usage
+                      if (appliedCoupon) {
+                        try {
+                          const couponRef = fsDoc(db, 'coupons', appliedCoupon.id);
+                          const freshSnap = await fsGetDoc(couponRef);
+                          if (freshSnap.exists()) {
+                            const current = freshSnap.data();
+                            const newUsedCount = (current.usedCount || 0) + 1;
+                            const updates = { usedCount: newUsedCount };
+                            if (typeof current.maxUses === 'number' && newUsedCount >= current.maxUses) {
+                              updates.status = 'inactive';
+                            }
+                            await updateDoc(couponRef, updates);
+                            await addDoc(collection(db, 'couponUsages'), {
+                              couponId: appliedCoupon.id,
+                              code: appliedCoupon.code,
+                              bookingId: bookingRef.id,
+                              userId: auth.currentUser.uid,
+                              discountApplied: discount,
+                              finalPrice,
+                              createdAt: serverTimestamp(),
+                            });
+                          }
+                        } catch (couponUseErr) {
+                          console.error('❌ Failed to record coupon usage:', couponUseErr);
+                        }
+                      }
                       resetBookingFields();
-                      console.log("🔥 Booking saved successfully!");
-                      setPaymentSuccess(true);
+                      setPaymentSuccess(true); // show green "Booking confirmed!" message
+
+                      // ✅ Send booking receipt AFTER confirmation is shown
+                      // try {
+                      //   const response = await fetch("http://localhost:4000/send-receipt", {
+                      //     method: "POST",
+                      //     headers: { "Content-Type": "application/json" },
+                      //     body: JSON.stringify({
+                      //       email: auth.currentUser.email,
+                      //       fullName: auth.currentUser.displayName || "Guest",
+                      //       listingTitle: listing?.title || "Booking",
+                      //       checkIn: safeCheckIn,
+                      //       checkOut: safeCheckOut,
+                      //       guests: totalGuests,
+                      //       price: finalPrice,
+                      //     }),
+                      //   });
+
+                      //   const result = await response.json();
+                      //   if (response.ok) {
+                      //     console.log("✅ Booking receipt sent successfully!", result);
+                      //   } else {
+                      //     console.error("❌ Failed to send booking receipt:", result);
+                      //   }
+
+                      // } catch (emailErr) {
+                      //   console.error("❌ Error sending booking receipt:", emailErr);
+                      // }
+
                     } catch (error) {
                       console.error("❌ Payment/Booking Error:", error);
-                      alert(
-                        "❌ Payment processed but failed to save booking or send receipt. Contact support."
-                      );
+                      alert("❌ Payment processed but failed to save booking or send receipt. Contact support.");
                     }
                   }}
+
                   onError={(err) => {
                     console.error("PayPal Error:", err);
                     alert("❌ Payment failed. Please try again.");
@@ -1424,8 +1761,8 @@ const ListingDetails = () => {
                 />
 
                 {paymentSuccess && (
-                  <div className="mt-3 p-3 bg-green-100 text-green-800 rounded-lg text-sm sm:text-base">
-                    ✅ Payment received. Booking confirmed!
+                  <div className="mt-3 p-3 bg-yellow-100 text-yellow-800 rounded-lg text-sm sm:text-base">
+                    ✅ Success! Booking awaiting host approval.
                   </div>
                 )}
               </PayPalScriptProvider>
