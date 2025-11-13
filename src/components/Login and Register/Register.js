@@ -21,6 +21,8 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false); // ✅ Prevent double submission
@@ -201,23 +203,95 @@ function Register() {
             required
           />
 
-          <input
-            type="password"
-            placeholder="Password (6+ characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-4 px-4 py-3 border border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500 outline-none"
-            required
-          />
+          <div className="relative mb-4">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password (6+ characters)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 pr-20 border border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500 outline-none"
+              required
+            />
+            <button
+              type="button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              {showPassword ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A11.955 11.955 0 001.5 12S5.25 18.75 12 18.75c2.195 0 4.2-.63 5.926-1.707" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.02 15.777A11.955 11.955 0 0022.5 12S18.75 5.25 12 5.25c-1.33 0-2.6.23-3.78.66" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.88 9.88a3 3 0 104.24 4.24" />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </button>
+          </div>
 
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full mb-6 px-4 py-3 border border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500 outline-none"
-            required
-          />
+          <div className="relative mb-6">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-3 pr-20 border border-gray-200 rounded-full focus:ring-2 focus:ring-orange-500 outline-none"
+              required
+            />
+            <button
+              type="button"
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+              onClick={() => setShowConfirmPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              {showConfirmPassword ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A11.955 11.955 0 001.5 12S5.25 18.75 12 18.75c2.195 0 4.2-.63 5.926-1.707" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.02 15.777A11.955 11.955 0 0022.5 12S18.75 5.25 12 5.25c-1.33 0-2.6.23-3.78.66" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.88 9.88a3 3 0 104.24 4.24" />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="w-5 h-5"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </button>
+          </div>
 
           <button
             type="submit"
