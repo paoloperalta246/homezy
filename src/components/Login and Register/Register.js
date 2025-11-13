@@ -115,7 +115,7 @@ function Register() {
         console.log('✅ Step 5: Verification email sent successfully');
       } catch (emailErr) {
         console.error('❌ Verification email error:', emailErr);
-        setMessage('⚠️ Registration successful, but verification email failed. Make sure server.js is running on port 4000.');
+        setMessage('⚠️ Registration successful, but verification email failed. Please contact support or try again later.');
         return;
       }
 

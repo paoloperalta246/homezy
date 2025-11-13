@@ -633,7 +633,7 @@ export default function HostVerification() {
                                 if (error.message.includes("UID not found")) {
                                   errorMessage += "User session expired. Please refresh and try again. ";
                                 } else if (error.message.includes("verification email")) {
-                                  errorMessage += "Failed to send verification email. Make sure server.js is running on port 4000. ";
+                                  errorMessage += "Failed to send verification email. Please try again or contact support. ";
                                 } else if (error.message.includes("Firestore")) {
                                   errorMessage += "Failed to save subscription data. ";
                                 } else {

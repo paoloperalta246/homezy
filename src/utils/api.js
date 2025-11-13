@@ -1,6 +1,6 @@
 // Centralized API endpoint resolver for email-related serverless/express routes
 // In development we hit the local Express server (server.js on port 4000)
-// In production (Netlify) we call deployed serverless functions
+// In production (Vercel/Netlify) we call deployed serverless functions
 export const getEmailEndpoint = (type) => {
   // Check if running on localhost (development) or deployed (production)
   const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -13,10 +13,15 @@ export const getEmailEndpoint = (type) => {
       default: throw new Error('Unknown email endpoint type: ' + type);
     }
   } else {
+    // Production: Works for both Vercel (/api/) and Netlify (/.netlify/functions/)
+    // Check if deployed on Vercel or Netlify
+    const isVercel = window.location.hostname.includes('vercel.app');
+    const baseUrl = isVercel ? '/api' : '/.netlify/functions';
+    
     switch (type) {
-      case 'verification': return '/.netlify/functions/sendVerification';
-      case 'receipt': return '/.netlify/functions/sendReceipt';
-      case 'cancellation': return '/.netlify/functions/sendCancellation';
+      case 'verification': return `${baseUrl}/sendVerification`;
+      case 'receipt': return `${baseUrl}/sendReceipt`;
+      case 'cancellation': return `${baseUrl}/sendCancellation`;
       default: throw new Error('Unknown email endpoint type: ' + type);
     }
   }

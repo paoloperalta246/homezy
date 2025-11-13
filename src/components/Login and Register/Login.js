@@ -196,7 +196,7 @@ function Login() {
         throw new Error(result.error || 'Failed to send');
       }
     } catch (err) {
-      setError('❌ Failed to resend verification email. Make sure server.js is running.');
+      setError('❌ Failed to resend verification email. Please try again or contact support.');
       console.error(err);
     } finally {
       setSending(false);
