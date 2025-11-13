@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { auth, db } from "../../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { getEmailEndpoint } from "../../utils/api";
+import { getEmailEndpoint, postJson } from '../../utils/api';
 import {
   collection,
   addDoc,
@@ -20,7 +20,6 @@ import {
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
 import { User, Calendar, Heart, LogOut, MessageCircle, Users, CreditCard, XCircle, Star, Bell } from "lucide-react";
-import { getEmailEndpoint, postJson } from '../../utils/api';
 
 const Bookings = () => {
   const location = useLocation();
