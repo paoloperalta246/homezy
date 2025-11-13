@@ -4,15 +4,16 @@ const admin = require("firebase-admin");
 // Lazy, safe initialization to avoid module-load crashes on missing/invalid env
 function ensureFirebaseAdmin() {
   if (admin.apps.length) return;
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) {
-    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT environment variable");
+  const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (!base64) {
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_BASE64 environment variable");
   }
   let serviceAccount;
   try {
-    serviceAccount = JSON.parse(raw);
+    const json = Buffer.from(base64, 'base64').toString('utf8');
+    serviceAccount = JSON.parse(json);
   } catch (e) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT is not valid JSON");
+    throw new Error("FIREBASE_SERVICE_ACCOUNT_BASE64 is not valid base64 or JSON: " + e.message);
   }
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
@@ -22,7 +23,6 @@ function ensureSendGrid() {
   if (!key) {
     throw new Error("Missing SENDGRID_API_KEY environment variable");
   }
-  // setApiKey is idempotent for same key; calling per request is fine
   sgMail.setApiKey(key);
 }
 

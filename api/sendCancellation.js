@@ -48,20 +48,76 @@ module.exports = async (req, res) => {
       from: { name: "Homezy Support 🏠", email: "paoloschoolacc@gmail.com" },
       subject: `❌ Your Homezy Booking Was Cancelled – ${listingTitle}`,
       html: `
-      <div style="background-color:#f4f6f8; padding:50px 0; font-family:'Inter', sans-serif;">
-        <div style="max-width:640px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.08);">
-          <div style="background:linear-gradient(135deg, #EF4444, #DC2626); padding:30px 20px; text-align:center;">
-            <h1 style="color:white; margin:0; font-size:28px;">Homezy Booking Cancelled</h1>
-          </div>
-          <div style="padding:40px 35px; text-align:left;">
-            <h2 style="color:#222; font-weight:700;">Hi ${fullName || "there"}! 👋</h2>
-            <p style="color:#444; font-size:16px;">Your booking at <strong style="color:#EF4444;">${listingTitle}</strong> has been cancelled. Total paid: PHP ${price}</p>
-          </div>
-          <div style="background:#f9fafb; padding:20px; text-align:center; border-top:1px solid #eee;">
-            <p style="font-size:12px; color:#999; margin:0;">© ${new Date().getFullYear()} Homezy, Inc. All rights reserved.</p>
+        <div style="background-color:#f4f6f8; padding:50px 0; font-family:'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+          <div style="max-width:640px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.08);">
+
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg, #EF4444, #DC2626); padding:30px 20px; text-align:center;">
+              <h1 style="color:white; margin:0; font-size:28px; letter-spacing:1px;">Homezy Booking Cancelled</h1>
+            </div>
+
+            <!-- Body -->
+            <div style="padding:40px 35px; text-align:left;">
+              <h2 style="color:#222; font-weight:700; margin-bottom:12px;">Hi ${fullName || "there"}! 👋</h2>
+              <p style="color:#444; font-size:16px; line-height:1.7; margin-bottom:24px;">
+                We wanted to inform you that your booking at <strong style="color:#EF4444;">${listingTitle}</strong> has been cancelled.
+              </p>
+
+              <!-- Cancelled Booking Card -->
+              <div style="background:#f9fafb; padding:30px; border-radius:12px; margin-bottom:24px; border:1px solid #FCA5A5;">
+                <table style="width:100%; border-collapse:collapse; font-size:15px; color:#333;">
+                  <tbody>
+                    <tr style="background:#ffffff;">
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;"><strong>Listing</strong></td>
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;">${listingTitle}</td>
+                    </tr>
+                    <tr style="background:#f4f6f8;">
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;"><strong>Check-in</strong></td>
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;">${checkIn}</td>
+                    </tr>
+                    <tr style="background:#ffffff;">
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;"><strong>Check-out</strong></td>
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;">${checkOut}</td>
+                    </tr>
+                    <tr style="background:#f4f6f8;">
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;"><strong>Guests</strong></td>
+                      <td style="padding:12px 15px; border-bottom:1px solid #e0e0e0;">${guests || "1"}</td>
+                    </tr>
+                    <tr style="background:#ffffff;">
+                      <td style="padding:12px 15px;"><strong>Total Paid</strong></td>
+                      <td style="padding:12px 15px;">PHP ${price}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p style="color:#555; font-size:15px; line-height:1.7; margin-bottom:24px;">
+                You've successfully cancelled your booking. If you have any questions or want to make a new booking, feel free to contact our support team.
+              </p>
+
+              <div style="margin:36px 0; padding:18px; background-color:#FEE2E2; border-radius:10px; border-left:4px solid #B91C1C;">
+                <p style="color:#B91C1C; font-size:14px; margin:0;">
+                  ⚠️ If you believe this is an error, please reach out to support as soon as possible.
+                </p>
+              </div>
+
+              <p style="font-size:14px; color:#888; text-align:center; margin-top:25px;">
+                Need help? Contact our support team at
+                <a href="mailto:homezy.support@gmail.com" style="color:#EF4444; text-decoration:none;">homezy.support@gmail.com</a>
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background:#f9fafb; padding:20px; text-align:center; border-top:1px solid #eee;">
+              <p style="font-size:12px; color:#999; margin:0;">
+                © ${new Date().getFullYear()} Homezy, Inc. All rights reserved.<br/>
+                123 Homezy Street, Manila, Philippines 🇵🇭
+              </p>
+            </div>
+
           </div>
         </div>
-      </div>`
+      `
     };
 
     await sgMail.send(msg);
