@@ -166,7 +166,7 @@ const Coupons = () => {
           usedCount: 0,
           status: 'active',
           hostId: auth.currentUser.uid,
-          createdAt: serverTimestamp(),
+          validDate: newCoupon.dateRange.startDate ? new Date(newCoupon.dateRange.startDate) : null,
           validFrom: newCoupon.dateRange.startDate ? new Date(newCoupon.dateRange.startDate) : null,
           expiresAt: newCoupon.dateRange.endDate ? new Date(newCoupon.dateRange.endDate) : null,
         };
@@ -574,21 +574,27 @@ const Coupons = () => {
                   {/* Details */}
                   <div className="space-y-2 mb-4 text-sm text-gray-600">
                     <div className="flex items-center justify-between">
-                      <span>Created:</span>
+                      <span>Valid Date:</span>
                       <span className="font-medium">
-                        {coupon.createdAt?.seconds 
-                          ? new Date(coupon.createdAt.seconds * 1000).toLocaleDateString()
-                          : 'N/A'
-                        }
+                        {coupon.validDate
+                          ? new Date(
+                              coupon.validDate.seconds
+                                ? coupon.validDate.seconds * 1000
+                                : coupon.validDate
+                            ).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : 'N/A'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Expires:</span>
+                      <span>Expiry Date:</span>
                       <span className={`font-medium ${coupon.isExpired ? 'text-red-600' : ''}`}>
-                        {coupon.expiresAt 
-                          ? coupon.expiresAt.toLocaleDateString()
-                          : 'Never'
-                        }
+                        {coupon.expiresAt
+                          ? new Date(
+                              coupon.expiresAt.seconds
+                                ? coupon.expiresAt.seconds * 1000
+                                : coupon.expiresAt
+                            ).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                          : 'Never'}
                       </span>
                     </div>
                     {showUsage && (
