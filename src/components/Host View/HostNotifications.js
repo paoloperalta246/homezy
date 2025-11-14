@@ -109,7 +109,7 @@ const HostNotifications = () => {
       if (modalAction === "approve") {
         if (notificationType === 'cancellation_request') {
           await handleApproveCancellation(selectedBooking, selectedNotif);
-          setSuccessMessage({ type: 'success', message: 'Cancellation approved! Guest can now cancel their booking.' });
+          setSuccessMessage({ type: 'success', message: 'Cancellation approved! Guest booking has been removed.' });
         } else {
           await handleApprove(selectedBooking, selectedNotif);
           setSuccessMessage({ type: 'success', message: 'Booking approved successfully! Guest has been notified.' });
@@ -886,23 +886,20 @@ const handleReject = async (bookingId, notifId) => {
 
 const handleApproveCancellation = async (bookingId, notifId) => {
   try {
-    // Update booking to allow cancellation
+    // Get booking data before deleting
     const bookingRef = doc(db, "bookings", bookingId);
-    await updateDoc(bookingRef, { 
-      cancellationStatus: "approved", 
-      cancellationApprovedAt: serverTimestamp() 
-    });
-
-    // Get booking data
     const bookingSnap = await getDoc(bookingRef);
     const bookingData = bookingSnap.data();
+
+    // Delete the booking immediately
+    await deleteDoc(bookingRef);
 
     // Create notification for guest
     const guestNotifData = {
       userId: bookingData.userId,
       type: "cancellation_approved",
       title: "Cancellation Approved ✅",
-      message: `The host has approved your cancellation request for "${bookingData.listingTitle}". You can now cancel your booking.`,
+      message: `The host has approved your cancellation request for "${bookingData.listingTitle}". Your booking has been removed.`,
       listingTitle: bookingData.listingTitle,
       bookingId: bookingId,
       read: false,
@@ -916,7 +913,7 @@ const handleApproveCancellation = async (bookingId, notifId) => {
       status: 'approved'
     });
     
-    console.log("✅ Cancellation approved and guest notified");
+    console.log("✅ Cancellation approved, booking deleted, and guest notified");
   } catch (err) {
     console.error("❌ Failed to approve cancellation:", err);
     throw err;

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { DateRange } from "react-date-range";
+import { enUS } from 'date-fns/locale';
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut, updateEmail } from "firebase/auth";
 import {
@@ -35,8 +37,13 @@ const Coupons = () => {
     discountType: 'percentage',
     discountValue: '',
     maxUses: 1,
-    expiresAt: ''
+    dateRange: {
+      startDate: null,
+      endDate: null,
+      key: 'selection',
+    },
   });
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -143,8 +150,9 @@ const Coupons = () => {
         alert('Percentage discount cannot exceed 100%');
         return;
       }
-      if (!newCoupon.maxUses || parseInt(newCoupon.maxUses) < 1) {
-        alert('Max uses must be at least 1');
+
+      if (!newCoupon.dateRange.endDate) {
+        alert('Please pick an expiration date.');
         return;
       }
 
@@ -159,7 +167,8 @@ const Coupons = () => {
           status: 'active',
           hostId: auth.currentUser.uid,
           createdAt: serverTimestamp(),
-          expiresAt: newCoupon.expiresAt ? new Date(newCoupon.expiresAt) : null
+          validFrom: newCoupon.dateRange.startDate ? new Date(newCoupon.dateRange.startDate) : null,
+          expiresAt: newCoupon.dateRange.endDate ? new Date(newCoupon.dateRange.endDate) : null,
         };
 
         await addDoc(collection(db, 'coupons'), couponData);
@@ -170,7 +179,11 @@ const Coupons = () => {
           discountType: 'percentage',
           discountValue: '',
           maxUses: 1,
-          expiresAt: ''
+          dateRange: {
+            startDate: null,
+            endDate: null,
+            key: 'selection',
+          },
         });
         fetchCoupons(auth.currentUser.uid);
       } catch (e) {
@@ -742,19 +755,43 @@ const Coupons = () => {
                     <p className="text-[10px] sm:text-xs text-gray-500 mt-1">How many times this coupon can be used total</p>
                   </div>
 
-                  {/* Expiration Date */}
+                  {/* Expiration Date (Required) */}
                   <div>
                     <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                      Expiration Date (Optional)
+                      Pick an Expiration Date
                     </label>
-                    <input
-                      type="date"
-                      value={newCoupon.expiresAt}
-                      onChange={(e) => setNewCoupon({...newCoupon, expiresAt: e.target.value})}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base"
-                    />
-                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Leave empty for no expiration</p>
+                    <button
+                      type="button"
+                      onClick={() => setCalendarOpen((v) => !v)}
+                      className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg bg-white text-left focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base mb-2"
+                    >
+                      {newCoupon.dateRange.startDate && newCoupon.dateRange.endDate
+                        ? `${new Date(newCoupon.dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(newCoupon.dateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                        : 'Pick an expiration date'}
+                    </button>
+                    {calendarOpen && (
+                      <div className="z-50 relative">
+                        <DateRange
+                          editableDateInputs={true}
+                          moveRangeOnFirstSelection={false}
+                          onChange={item => setNewCoupon({
+                            ...newCoupon,
+                            dateRange: item.selection
+                          })}
+                          ranges={[newCoupon.dateRange]}
+                          locale={enUS}
+                          className="border border-gray-200 rounded-xl shadow-sm mx-auto w-full sm:w-auto"
+                          direction="vertical"
+                          minDate={new Date()}
+                        />
+                        <button
+                          type="button"
+                          className="mt-2 px-4 py-2 bg-gray-200 rounded-lg text-gray-700 hover:bg-gray-300"
+                          onClick={() => setCalendarOpen(false)}
+                        >Done</button>
+                      </div>
+                    )}
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">This is required.</p>
                   </div>
 
                   {/* Info Box */}

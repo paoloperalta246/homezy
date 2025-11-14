@@ -429,6 +429,23 @@ const ListingDetails = () => {
   // -----------------------
   // Render UI (keeps all your layout + new features)
   // -----------------------
+  // Handler for Message Host button
+  const handleMessageHost = () => {
+    if (!user) {
+      alert("Please log in to message the host.");
+      navigate("/login");
+      return;
+    }
+    // Pass hostId and hostName via navigation state for direct convo
+    const hostId = listing?.hostId || listing?.ownerId;
+    const hostName = listing?.hostName || "Host";
+    if (hostId) {
+      navigate("/guest-messages", { state: { hostId, hostName } });
+    } else {
+      alert("Host information not available.");
+    }
+  };
+
   return (
     <div className="font-sans bg-[#fafafa] min-h-screen">
       {/* HEADER */}
@@ -772,6 +789,14 @@ const ListingDetails = () => {
                   {listing.hostName}
                 </span>
               </span>
+              {/* Message Host Button */}
+              <button
+                onClick={handleMessageHost}
+                className="ml-3 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full text-xs sm:text-sm font-semibold shadow hover:from-orange-600 hover:to-orange-700 transition-all duration-200"
+                style={{ marginLeft: 12 }}
+              >
+                Message Host
+              </button>
             </p>
 
             {/* Reviews */}

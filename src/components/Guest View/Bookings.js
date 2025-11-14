@@ -851,51 +851,13 @@ const Bookings = () => {
                           const cancelledBooking = bookings.find((b) => b.id === cancelBookingId);
                           if (!cancelledBooking) throw new Error("Booking not found");
 
-                          // Check if booking has cancellationStatus
+                          // If host has approved cancellation, remove booking immediately (no guest action needed)
                           if (cancelledBooking.cancellationStatus === 'approved') {
-                            // Host approved - proceed with cancellation
-                            await deleteDoc(doc(db, "bookings", cancelBookingId));
+                            // Remove from UI only
                             setBookings(bookings.filter((b) => b.id !== cancelBookingId));
                             setCancelBookingId(null);
-
-                            // Send cancellation email
-                            const guestDoc = await getDoc(doc(db, "guests", cancelledBooking.userId));
-                            const guestData = guestDoc.exists() ? guestDoc.data() : {};
-                            const guestEmail = guestData.email || "";
-                            const guestName = guestData.fullName || "Guest";
-
-                            const safeCheckIn = cancelledBooking.checkIn?.seconds
-                              ? new Date(cancelledBooking.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                              : cancelledBooking.checkIn || "Not specified";
-
-                            const safeCheckOut = cancelledBooking.checkOut?.seconds
-                              ? new Date(cancelledBooking.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                              : cancelledBooking.checkOut || "Not specified";
-
-                            const totalGuests = cancelledBooking.guests
-                              ? (cancelledBooking.guests.adults || 0) +
-                              (cancelledBooking.guests.children || 0) +
-                              (cancelledBooking.guests.infants || 0) +
-                              (cancelledBooking.guests.pets || 0)
-                              : 1;
-
-                            const price = cancelledBooking.price || 0;
-
-                            await fetch(getEmailEndpoint('cancellation'), {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                email: guestEmail,
-                                fullName: guestName,
-                                listingTitle: cancelledBooking.listingTitle,
-                                checkIn: safeCheckIn,
-                                checkOut: safeCheckOut,
-                                guests: totalGuests,
-                                price,
-                              }),
-                            });
-
-                            alert("✅ Booking cancelled and email sent successfully!");
+                            alert("✅ Host approved cancellation. Your booking has been removed.");
+                            return;
                           } else {
                             // Send cancellation request to host
                             await updateDoc(doc(db, "bookings", cancelBookingId), {

@@ -171,6 +171,21 @@ const GuestMessages = () => {
     setActiveChat({ chatId, otherUser: other });
   };
 
+  // If navigated with state (hostId, hostName), open chat automatically
+  useEffect(() => {
+    if (location.state && location.state.hostId && user) {
+      // Find host in hostsList or create minimal object
+      const host = hostsList.find(h => h.id === location.state.hostId) || {
+        id: location.state.hostId,
+        fullName: location.state.hostName || "Host",
+        role: "host"
+      };
+      openChatWith(host);
+    }
+    // Only run when hostsList, user, or location.state changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, hostsList, user]);
+
   // send message
   const sendMessage = async (e) => {
     e?.preventDefault();
