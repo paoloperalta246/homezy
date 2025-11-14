@@ -891,6 +891,21 @@ const handleApproveCancellation = async (bookingId, notifId) => {
     const bookingSnap = await getDoc(bookingRef);
     const bookingData = bookingSnap.data();
 
+    // Send cancellation receipt to guest
+    await fetch(getEmailEndpoint('cancellation'), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: bookingData.guestEmail,
+        fullName: bookingData.guestName,
+        listingTitle: bookingData.listingTitle,
+        checkIn: bookingData.checkIn?.toDate?.() ? bookingData.checkIn.toDate().toLocaleDateString() : "N/A",
+        checkOut: bookingData.checkOut?.toDate?.() ? bookingData.checkOut.toDate().toLocaleDateString() : "N/A",
+        guests: bookingData.guests?.total || 1,
+        price: bookingData.finalPrice,
+      }),
+    });
+
     // Delete the booking immediately
     await deleteDoc(bookingRef);
 
@@ -913,7 +928,7 @@ const handleApproveCancellation = async (bookingId, notifId) => {
       status: 'approved'
     });
     
-    console.log("✅ Cancellation approved, booking deleted, and guest notified");
+    console.log("✅ Cancellation approved, booking deleted, guest notified, and cancellation receipt sent");
   } catch (err) {
     console.error("❌ Failed to approve cancellation:", err);
     throw err;
