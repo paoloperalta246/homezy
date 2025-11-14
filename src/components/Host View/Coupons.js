@@ -478,7 +478,7 @@ const Coupons = () => {
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition whitespace-nowrap"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition whitespace-nowrap justify-center sm:justify-start"
             >
               <Plus className="w-5 h-5" />
               Create Coupon
@@ -627,23 +627,23 @@ const Coupons = () => {
           {showCreateModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
-                  <h3 className="text-2xl font-bold text-[#23364A] flex items-center gap-2">
-                    <Ticket className="w-6 h-6 text-orange-500" />
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between rounded-t-3xl">
+                  <h3 className="text-lg sm:text-2xl font-bold text-[#23364A] flex items-center gap-2">
+                    <Ticket className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500" />
                     Create New Coupon
                   </h3>
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                    className="p-2 sm:p-2.5 hover:bg-gray-100 rounded-full transition"
                   >
                     <X className="w-5 h-5 text-gray-600" />
                   </button>
                 </div>
-                
-                <div className="p-6 space-y-5">
+
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
                   {/* Coupon Code */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                       Coupon Code *
                     </label>
                     <div className="flex gap-2">
@@ -652,28 +652,28 @@ const Coupons = () => {
                         value={newCoupon.code}
                         onChange={(e) => setNewCoupon({...newCoupon, code: e.target.value.toUpperCase()})}
                         placeholder="e.g., SUMMER2024"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                        className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base"
                         maxLength={20}
                       />
                       <button
                         onClick={() => setNewCoupon({...newCoupon, code: generateCouponCode()})}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition"
+                        className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition text-xs sm:text-sm"
                       >
                         Generate
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Must be unique. Letters and numbers only.</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Must be unique. Letters and numbers only.</p>
                   </div>
 
                   {/* Discount Type */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                       Discount Type *
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
                       <button
                         onClick={() => setNewCoupon({...newCoupon, discountType: 'percentage'})}
-                        className={`px-4 py-3 rounded-lg font-medium transition ${
+                        className={`px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition text-xs sm:text-sm ${
                           newCoupon.discountType === 'percentage'
                             ? 'bg-orange-500 text-white shadow-md'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -683,7 +683,7 @@ const Coupons = () => {
                       </button>
                       <button
                         onClick={() => setNewCoupon({...newCoupon, discountType: 'fixed'})}
-                        className={`px-4 py-3 rounded-lg font-medium transition ${
+                        className={`px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition text-xs sm:text-sm ${
                           newCoupon.discountType === 'fixed'
                             ? 'bg-orange-500 text-white shadow-md'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -696,29 +696,29 @@ const Coupons = () => {
 
                   {/* Discount Value */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                       Discount Value *
                     </label>
                     <div className="relative">
                       {newCoupon.discountType === 'fixed' && (
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">₱</span>
+                        <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs sm:text-base">₱</span>
                       )}
                       <input
                         type="number"
                         value={newCoupon.discountValue}
                         onChange={(e) => setNewCoupon({...newCoupon, discountValue: e.target.value})}
                         placeholder={newCoupon.discountType === 'percentage' ? 'e.g., 20' : 'e.g., 500'}
-                        className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none ${
-                          newCoupon.discountType === 'fixed' ? 'pl-8' : ''
+                        className={`w-full px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base ${
+                          newCoupon.discountType === 'fixed' ? 'pl-7 sm:pl-8' : ''
                         }`}
                         min="0"
                         max={newCoupon.discountType === 'percentage' ? '100' : undefined}
                       />
                       {newCoupon.discountType === 'percentage' && (
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                        <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs sm:text-base">%</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
                       {newCoupon.discountType === 'percentage' 
                         ? 'Enter a percentage between 1-100' 
                         : 'Enter the fixed discount amount in pesos'
@@ -728,7 +728,7 @@ const Coupons = () => {
 
                   {/* Max Uses */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                       Maximum Uses *
                     </label>
                     <input
@@ -736,15 +736,15 @@ const Coupons = () => {
                       value={newCoupon.maxUses}
                       onChange={(e) => setNewCoupon({...newCoupon, maxUses: e.target.value})}
                       placeholder="e.g., 10"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base"
                       min="1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">How many times this coupon can be used total</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">How many times this coupon can be used total</p>
                   </div>
 
                   {/* Expiration Date */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
                       Expiration Date (Optional)
                     </label>
                     <input
@@ -752,30 +752,30 @@ const Coupons = () => {
                       value={newCoupon.expiresAt}
                       onChange={(e) => setNewCoupon({...newCoupon, expiresAt: e.target.value})}
                       min={new Date().toISOString().split('T')[0]}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none"
+                      className="w-full px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm sm:text-base"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty for no expiration</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Leave empty for no expiration</p>
                   </div>
 
                   {/* Info Box */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                    <p className="text-sm text-blue-800">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4">
+                    <p className="text-xs sm:text-sm text-blue-800">
                       <strong>💡 Tip:</strong> Creating coupons is completely free! Use them to attract more guests and increase your bookings.
                     </p>
                   </div>
                 </div>
                 
-                <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-3xl flex gap-3">
+                <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-3 sm:py-4 rounded-b-3xl flex gap-2 sm:gap-3">
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition"
+                    className="flex-1 px-4 sm:px-6 py-2 sm:py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-xl transition text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleCreateCoupon}
                     disabled={creating}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                   >
                     {creating ? 'Creating...' : 'Create Coupon'}
                   </button>

@@ -40,7 +40,7 @@ const PointsRewards = () => {
     const totalPages = Math.ceil(transactions.length / itemsPerPage);
 
     const BookingCard = ({ booking }) => (
-        <div className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-transform duration-300 overflow-hidden relative w-72">
+        <div className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-transform duration-300 overflow-hidden relative w-full max-w-xs min-w-0">
             <div className="relative h-48 w-full">
                 <img
                     src={booking.listingImage || "/default-listing.png"}
@@ -182,7 +182,7 @@ const PointsRewards = () => {
     };
 
     return (
-        <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans">
+        <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans max-w-full overflow-x-hidden">
             <>
                 {/* Mobile Hamburger */}
                 <div className="md:hidden fixed top-4 left-4 z-50">
@@ -349,7 +349,7 @@ const PointsRewards = () => {
             </>
 
             {/* ===== Main Content ===== */}
-            <main className="flex-1 px-4 sm:px-8 md:px-16 py-10 md:ml-[260px]">
+            <main className="flex-1 px-4 sm:px-8 md:px-16 py-10 md:ml-[260px] max-w-full overflow-x-hidden">
                 <div className="mb-8">
                     <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
                         <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
@@ -567,24 +567,24 @@ const PointsRewards = () => {
 
                                 {/* Pagination Controls */}
                                 {totalPages > 1 && (
-                                    <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
-                                        <div className="text-sm text-gray-600">
+                                    <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 pt-4 gap-3">
+                                        <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
                                             Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, transactions.length)} of {transactions.length} transactions
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center justify-center gap-2 w-full sm:w-auto">
                                             <button
                                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                                 disabled={currentPage === 1}
-                                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition ${currentPage === 1
+                                                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === 1
                                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                         : 'bg-orange-500 text-white hover:bg-orange-600'
                                                     }`}
                                             >
                                                 <ChevronLeft className="w-4 h-4" />
-                                                Previous
+                                                <span className="hidden xs:inline">Previous</span>
                                             </button>
 
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 flex-wrap">
                                                 {[...Array(totalPages)].map((_, idx) => {
                                                     const pageNum = idx + 1;
                                                     // Show first page, last page, current page, and pages around current
@@ -597,7 +597,7 @@ const PointsRewards = () => {
                                                             <button
                                                                 key={pageNum}
                                                                 onClick={() => setCurrentPage(pageNum)}
-                                                                className={`w-8 h-8 rounded-lg text-sm font-medium transition ${currentPage === pageNum
+                                                                className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === pageNum
                                                                         ? 'bg-orange-500 text-white'
                                                                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                                     }`}
@@ -618,12 +618,12 @@ const PointsRewards = () => {
                                             <button
                                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                                 disabled={currentPage === totalPages}
-                                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition ${currentPage === totalPages
+                                                className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === totalPages
                                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                                         : 'bg-orange-500 text-white hover:bg-orange-600'
                                                     }`}
                                             >
-                                                Next
+                                                <span className="hidden xs:inline">Next</span>
                                                 <ChevronRight className="w-4 h-4" />
                                             </button>
                                         </div>

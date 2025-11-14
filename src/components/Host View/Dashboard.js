@@ -310,7 +310,7 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans">
+    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans relative">
       <>
         {/* Mobile Hamburger */}
         <div className="md:hidden fixed top-4 left-4 z-50">
@@ -346,8 +346,7 @@ const Dashboard = () => {
 
         {/* Sidebar */}
         <aside
-          className={`fixed top-0 left-0 h-screen bg-[#F9FAFB] border-r border-gray-200 flex flex-col justify-between w-[260px] z-40 transition-transform duration-300 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-[260px]"
-            }`}
+          className={`fixed top-0 left-0 h-screen bg-[#F9FAFB] border-r border-gray-200 flex flex-col justify-between w-[80vw] max-w-[260px] z-40 transition-transform duration-300 md:w-[260px] md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-[80vw] md:translate-x-0"}`}
         >
           <div>
             <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10">
@@ -477,22 +476,22 @@ const Dashboard = () => {
       </>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 px-4 sm:px-8 md:px-16 py-6 sm:py-8 md:py-10 pt-16 sm:pt-6 md:pt-10 md:ml-[260px]">
+      <main className="flex-1 px-2 xs:px-4 sm:px-8 md:px-16 py-4 xs:py-6 sm:py-8 md:py-10 pt-16 sm:pt-6 md:pt-10 md:ml-[260px] transition-all max-w-full overflow-x-hidden">
         {/* Page Heading */}
-        <div className="mb-6 sm:mb-8">
-          <h2 className="text-xl sm:text-2xl md:text-[32px] font-bold mb-2 flex items-center gap-2">
-            <span className="p-1.5 sm:p-2 rounded-xl bg-orange-500/10 text-orange-600">
+        <div className="mb-4 xs:mb-6 sm:mb-8">
+          <h2 className="text-lg xs:text-xl sm:text-2xl md:text-[32px] font-bold mb-2 flex items-center gap-2">
+            <span className="p-1 sm:p-1.5 md:p-2 rounded-xl bg-orange-500/10 text-orange-600">
               <Home className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
             </span>
             Dashboard
           </h2>
-          <p className="text-[#5E6282] text-sm sm:text-base md:text-lg mb-6 sm:mb-8">Welcome back! Here's your property overview.</p>
+          <p className="text-[#5E6282] text-xs xs:text-sm sm:text-base md:text-lg mb-4 xs:mb-6 sm:mb-8">Welcome back! Here's your property overview.</p>
         </div>
 
         {/* Stats Cards */}
         {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 xs:gap-3 sm:gap-4 mb-4 xs:mb-6 sm:mb-8 w-full max-w-full">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <div className="bg-white/20 p-2 sm:p-2.5 md:p-3 rounded-lg">
                   <DollarSign className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-white" />
@@ -511,7 +510,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 hover:shadow-lg transition-shadow text-white">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
               <div className="flex items-center justify-between mb-3">
                 <div className="bg-white/20 p-3 rounded-lg">
                   <Clipboard className="w-6 h-6 text-white" />
@@ -530,7 +529,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white">
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <div className="bg-white/20 p-2 sm:p-2.5 md:p-3 rounded-lg">
                   <Calendar className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-white" />
@@ -546,7 +545,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
               <div className="flex items-center justify-between mb-2 sm:mb-3">
                 <div className="bg-white/20 p-2 sm:p-2.5 md:p-3 rounded-lg">
                   <Home className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-white" />
@@ -566,8 +565,8 @@ const Dashboard = () => {
 
         {/* Performance Overview */}
         {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 xs:gap-3 sm:gap-4 mb-4 xs:mb-6 sm:mb-8 w-full max-w-full">
+            <div className="bg-white border border-gray-200 rounded-xl p-3 xs:p-4 sm:p-5 md:p-6 shadow-sm w-full max-w-full min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
                 <div className="w-1 h-5 bg-orange-500 rounded"></div>
                 Monthly Performance
@@ -625,7 +624,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-xl p-3 xs:p-4 sm:p-5 md:p-6 shadow-sm w-full max-w-full min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
                 <div className="w-1 h-4 sm:h-5 bg-orange-500 rounded"></div>
                 Quick Actions
@@ -689,7 +688,7 @@ const Dashboard = () => {
 
         {/* Recent Reservations */}
         {!loading && recentReservations.length > 0 && (
-          <div className="mb-6 sm:mb-8">
+          <div className="mb-4 xs:mb-6 sm:mb-8">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 rounded-xl bg-orange-500/10">
@@ -707,9 +706,9 @@ const Dashboard = () => {
               </button>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
+            <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
+              <div className="w-full max-w-full">
+                <table className="w-full max-w-full">
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-orange-200">
                     <tr>
                       <th className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
@@ -867,7 +866,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        
+
       </main>
     </div>
   );

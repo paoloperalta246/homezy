@@ -380,7 +380,7 @@ const Homes = () => {
 
   const renderCard = (item) => (
     <Link to={`/listing/${item.id}`}>
-      <div className="bg-white rounded-2xl shadow-lg hover:-translate-y-1 transition-transform duration-300 text-left w-72 relative">
+      <div className="bg-white rounded-2xl shadow-lg hover:-translate-y-1 transition-transform duration-300 text-left w-full max-w-xs sm:w-72 relative">
         {/* Wishlist button */}
         <button
           onClick={(e) => {

@@ -225,7 +225,7 @@ const HostBookings = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans">
+    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans max-w-full overflow-x-hidden">
       <>
         {/* Mobile Hamburger */}
         <div className="md:hidden fixed top-4 left-4 z-50">
@@ -392,7 +392,7 @@ const HostBookings = () => {
       </>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 px-4 sm:px-8 md:px-16 py-10 md:ml-[260px]">
+      <main className="flex-1 px-4 sm:px-8 md:px-16 py-10 md:ml-[260px] max-w-full overflow-x-hidden">
         {/* Tab Switcher */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex gap-2 p-1.5 bg-gray-100 rounded-xl shadow-sm">
@@ -427,82 +427,25 @@ const HostBookings = () => {
 
         {loading ? (
           <p className="text-center text-gray-500 py-16 text-lg">Loading bookings...</p>
-        ) : activeTab === "today" ? (
-          <div className="mb-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 w-full gap-4">
-              {/* Left side: Heading + description + reserved space */}
-              <div className="flex-1 min-w-0 flex flex-col">
-                <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
-                  <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
-                    <Home className="w-7 h-7" />
-                  </span>
-                  Today's Bookings
-                </h2>
-                <p className="text-[#5E6282] text-base sm:text-lg mb-8">Check-ins and activities happening today</p>
-
-                {/* Reserve space for "Results for:" */}
-                <div className="mt-2 mb-10 min-h-[32px]">
-                  {searchTerm && (
-                    <span className="text-[#FF5A1F] font-bold text-xl sm:text-2xl truncate block">
-                      Results for: <span className="font-extrabold">{searchTerm}</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Right side: Search bar */}
-              <div className="flex flex-col sm:flex-row flex-shrink-0 items-start sm:items-center gap-2 w-full sm:w-auto">
-                <input
-                  type="text"
-                  placeholder="Search bookings..."
-                  className="border border-gray-300 px-3 py-2 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-[#FF5A1F] outline-none text-sm sm:text-base"
-                  value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') setSearchTerm(searchInput.trim()); }}
-                />
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <button
-                    onClick={() => setSearchTerm(searchInput.trim())}
-                    className="bg-[#FF5A1F] text-white px-3 py-2 rounded-lg font-medium hover:opacity-90 transition w-full sm:w-auto text-sm sm:text-base"
-                  >
-                    Search
-                  </button>
-                  {searchTerm && (
-                    <button
-                      onClick={() => { setSearchTerm(""); setSearchInput(""); }}
-                      className="text-gray-500 hover:text-[#FF5A1F] px-2 py-2 rounded w-full sm:w-auto text-sm sm:text-base"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {todayBookings.length === 0 ? (
-              <p className="text-gray-500">No bookings for today.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {todayBookings
-                  .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
-                  .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
-              </div>
-            )}
-          </div>
         ) : (
           <div className="mb-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 w-full gap-4">
               {/* Left side: Heading + description + reserved space */}
               <div className="flex-1 min-w-0 flex flex-col">
-                <h2 className="text-2xl sm:text-[32px] font-bold mb-2 flex items-center gap-2">
+                <h2 className="text-2xl sm:text-[32px] font-bold mb-1 sm:mb-2 flex items-center gap-2">
                   <span className="p-2 rounded-xl bg-orange-500/10 text-orange-600">
                     <Home className="w-7 h-7" />
                   </span>
-                  Upcoming Bookings
+                  {activeTab === "today" ? "Today's Bookings" : "Upcoming Bookings"}
                 </h2>
-                <p className="text-[#5E6282] text-base sm:text-lg mb-8">All future reservations and scheduled stays</p>
+                <p className="text-[#5E6282] text-base sm:text-lg mb-3 sm:mb-8">
+                  {activeTab === "today"
+                    ? "Check-ins and activities happening today"
+                    : "All future reservations and scheduled stays"}
+                </p>
 
-                <div className="mt-2 min-h-[32px]">
+                {/* Reserve space for "Results for:" */}
+                <div className="mt-1 sm:mt-2 min-h-[32px] mb-3 sm:mb-0">
                   {searchTerm && (
                     <span className="text-[#FF5A1F] font-bold text-xl sm:text-2xl truncate block">
                       Results for: <span className="font-extrabold">{searchTerm}</span>
@@ -540,15 +483,25 @@ const HostBookings = () => {
               </div>
             </div>
 
-            {upcomingBookings.length === 0 ? (
-              <p className="text-gray-500">No upcoming bookings.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {upcomingBookings
-                  .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
-                  .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
-              </div>
-            )}
+            {activeTab === "today"
+              ? todayBookings.length === 0
+                ? <p className="text-gray-500">No bookings for today.</p>
+                : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {todayBookings
+                      .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
+                  </div>
+                )
+              : upcomingBookings.length === 0
+                ? <p className="text-gray-500">No upcoming bookings.</p>
+                : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {upcomingBookings
+                      .filter(b => !searchTerm || b.listingTitle.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((b) => <BookingCard key={b.id} booking={b} className="sm:min-h-[250px] lg:min-h-[280px]" />)}
+                  </div>
+                )}
           </div>
         )}
       </main>

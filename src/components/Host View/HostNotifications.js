@@ -264,7 +264,7 @@ const HostNotifications = () => {
 
 
   return (
-    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans">
+    <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans max-w-full overflow-x-hidden">
       <>
         {/* Mobile Hamburger */}
         <div className="md:hidden fixed top-4 left-4 z-50">
@@ -431,7 +431,7 @@ const HostNotifications = () => {
       </>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 px-4 sm:px-8 md:px-16 py-6 sm:py-10 md:ml-[260px] pt-16 sm:pt-10">
+      <main className="flex-1 px-4 sm:px-8 md:px-16 py-6 sm:py-10 md:ml-[260px] pt-16 sm:pt-10 max-w-full overflow-x-hidden">
         <h2 className="text-xl sm:text-2xl md:text-[32px] font-bold mb-2 flex items-center gap-2">
           <span className="p-1.5 sm:p-2 rounded-xl bg-orange-500/10 text-orange-600">
             <Bell className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
