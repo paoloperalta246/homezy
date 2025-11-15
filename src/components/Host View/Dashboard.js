@@ -30,15 +30,23 @@ const Dashboard = () => {
     return d;
   };
 
+
+  // Match Bookings.js logic for today and upcoming
   const todayBookings = bookings.filter(
     (b) =>
+      b.status === 'confirmed' &&
       normalizeDate(b.checkIn) <= today &&
       normalizeDate(b.checkOut) >= today
   );
 
   const upcomingBookings = bookings.filter(
-    (b) => normalizeDate(b.checkIn) > today
+    (b) =>
+      b.status === 'confirmed' &&
+      normalizeDate(b.checkIn) > today
   );
+
+  // All bookings (only confirmed, matching Bookings.js summary)
+  const allBookings = bookings.filter(b => b.status === 'confirmed');
 
   // Calculate dashboard metrics
   const thisMonth = new Date();
@@ -504,28 +512,9 @@ const Dashboard = () => {
                 </div>
               </div>
               <p className="text-sm text-blue-100 mb-1">Total Revenue</p>
-              <p className="text-2xl font-bold text-white">₱{totalRevenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-white">₱{totalRevenue.toLocaleString()}.00</p>
               <p className="text-xs text-blue-200 mt-2">
-                ₱{thisMonthRevenue.toLocaleString()} this month
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
-              <div className="flex items-center justify-between mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <Clipboard className="w-6 h-6 text-white" />
-                </div>
-                <div className={`px-2.5 py-1 rounded-full text-xs font-bold ${parseFloat(bookingGrowth) >= 0
-                    ? 'bg-green-400/30 text-green-100'
-                    : 'bg-red-400/30 text-red-100'
-                  }`}>
-                  {parseFloat(bookingGrowth) >= 0 ? '↑' : '↓'} {Math.abs(bookingGrowth)}%
-                </div>
-              </div>
-              <p className="text-sm text-purple-100 mb-1">Monthly Bookings</p>
-              <p className="text-2xl font-bold text-white">{thisMonthBookings.length}</p>
-              <p className="text-xs text-purple-200 mt-2">
-                {thisMonthBookings.length} this month vs {lastMonthBookings.length} last month
+                ₱{thisMonthRevenue.toLocaleString()}.00 this month
               </p>
             </div>
 
@@ -535,13 +524,13 @@ const Dashboard = () => {
                   <Calendar className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-white" />
                 </div>
                 <div className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-white/20 text-green-100">
-                  {occupancyRate}%
+                  {todayBookings.length}
                 </div>
               </div>
               <p className="text-xs sm:text-sm text-green-100 mb-1">Active Today</p>
               <p className="text-xl sm:text-2xl font-bold text-white">{todayBookings.length}</p>
               <p className="text-xs text-green-200 mt-1 sm:mt-2">
-                Current occupancy rate
+                Bookings happening today
               </p>
             </div>
 
@@ -551,13 +540,29 @@ const Dashboard = () => {
                   <Home className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-white" />
                 </div>
                 <div className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-white/20 text-orange-100">
-                  {upcomingRate}%
+                  {upcomingBookings.length}
                 </div>
               </div>
               <p className="text-xs sm:text-sm text-orange-100 mb-1">Upcoming Bookings</p>
               <p className="text-xl sm:text-2xl font-bold text-white">{upcomingBookings.length}</p>
               <p className="text-xs text-orange-200 mt-1 sm:mt-2">
                 Future reservations scheduled
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 sm:p-5 md:p-6 hover:shadow-lg transition-shadow text-white w-full max-w-full min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <div className="bg-white/20 p-3 rounded-lg">
+                  <Clipboard className="w-6 h-6 text-white" />
+                </div>
+                <div className="px-2.5 py-1 rounded-full text-xs font-bold bg-white/20 text-purple-100">
+                  {allBookings.length}
+                </div>
+              </div>
+              <p className="text-sm text-purple-100 mb-1">All Bookings</p>
+              <p className="text-2xl font-bold text-white">{allBookings.length}</p>
+              <p className="text-xs text-purple-200 mt-2">
+                Includes all bookings (today, upcoming, and past)
               </p>
             </div>
           </div>
@@ -579,7 +584,7 @@ const Dashboard = () => {
                     </div>
                     <div>
                       <p className="text-xs text-gray-600">This Month Revenue</p>
-                      <p className="text-base sm:text-lg font-bold text-gray-800">₱{thisMonthRevenue.toLocaleString()}</p>
+                      <p className="text-base sm:text-lg font-bold text-gray-800">₱{thisMonthRevenue.toLocaleString()}.00</p>
                     </div>
                   </div>
                   <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${parseFloat(revenueGrowth) >= 0
@@ -616,7 +621,7 @@ const Dashboard = () => {
                     <div>
                       <p className="text-xs text-gray-600">Average Booking Value</p>
                       <p className="text-base sm:text-lg font-bold text-gray-800">
-                        ₱{bookings.length > 0 ? (totalRevenue / bookings.length).toLocaleString(undefined, { maximumFractionDigits: 0 }) : 0}
+                        ₱{bookings.length > 0 ? (totalRevenue / bookings.length).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '.00' : '0.00'}
                       </p>
                     </div>
                   </div>

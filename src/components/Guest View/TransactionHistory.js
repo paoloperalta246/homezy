@@ -17,9 +17,55 @@ import {
 import defaultProfile from "./images/default-profile.png";
 import { User, Calendar, Heart, LogOut, MessageCircle, Bell, History, Star } from "lucide-react";
 
-const Experiences = () => {
+const TransactionHistory = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Navbar dropdown refs
+  const dropdownButtonRef = useRef(null);
+  const dropdownMenuRef = useRef(null);
+
+  // Guest dropdown ref
+  const guestRef = useRef(null);
+
+  // Date dropdown ref
+  const dateRef = useRef(null);
+
+  // Location dropdown ref
+  const locationRef = useRef(null);
+
+  const [reviews, setReviews] = useState([]);
+
+  const [locations, setLocations] = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [guestOpen, setGuestOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [wishlist, setWishlist] = useState([]);
+
+  const [allListings, setAllListings] = useState([]);
+  const [userBookings, setUserBookings] = useState([]);
+  const [suggestedListings, setSuggestedListings] = useState([]);
+
+  const [searchLocation, setSearchLocation] = useState("");
+  const [selectedDate, setSelectedDate] = useState(""); // only one date
+  const [guests, setGuests] = useState({
+    adults: 0,
+    children: 0,
+    infants: 0,
+    pets: 0,
+  });
+  const [filteredListings, setFilteredListings] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Helper for date formatting
+  function formatDateField(field) {
+    if (!field) return "-";
+    if (field.seconds) return new Date(field.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(field).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
 
   const DropdownPortal = ({ children }) => {
     return createPortal(
@@ -27,49 +73,6 @@ const Experiences = () => {
       document.body // render directly in body
     );
   };
-
-  // Navbar user dropdown
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  const dropdownMenuRef = useRef(null);
-  const [reviews, setReviews] = useState([]);
-  const dropdownButtonRef = useRef(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Guest dropdown
-  const [guestOpen, setGuestOpen] = useState(false);
-  const guestRef = useRef(null);
-
-  // Location dropdown ref
-  const locationRef = useRef(null);
-
-  const [allExperiences, setAllExperiences] = useState([]);
-  const [userBookings, setUserBookings] = useState([]);
-  const [suggestedExperiences, setSuggestedExperiences] = useState([]);
-
-  const [user, setUser] = useState(null);
-  const [locations, setLocations] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
-
-  const [allListings, setAllListings] = useState([]);
-
-  // Search states
-  const [searchLocation, setSearchLocation] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
-  const [guests, setGuests] = useState({
-    adults: 0,
-    children: 0,
-    infants: 0,
-    pets: 0,
-  });
-  const [filteredExperiences, setFilteredExperiences] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-
-  const dateRef = useRef(null);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(""); // only one date
 
   // Format date display
   const formatDateDisplay = () => {
@@ -83,15 +86,85 @@ const Experiences = () => {
     setDateOpen(false);
   };
 
-  // Handle search filtering
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        // Fetch only home listings
+        const q = query(
+          collection(db, "listings"),
+          where("category", "==", "home")
+        );
+        const querySnapshot = await getDocs(q);
+
+        // Extract unique locations from home category only
+        const locs = Array.from(
+          new Set(querySnapshot.docs.map((doc) => doc.data().location).filter(Boolean))
+        );
+
+        setLocations(locs); // update state
+      } catch (error) {
+        console.error("Error fetching locations:", error);
+      }
+    };
+
+    fetchLocations();
+  }, []);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "reviews"));
+        const fetchedReviews = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setReviews(fetchedReviews);
+      } catch (err) {
+        console.error("Error fetching reviews:", err);
+      }
+    };
+
+    fetchReviews();
+  }, []);
+
+
+  const getSearchHeader = () => {
+    const parts = [];
+
+    // Date
+    if (selectedDate) {
+      const formattedDate = new Date(selectedDate).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      parts.push(`on ${formattedDate}`);
+    }
+
+    // Location
+    if (searchLocation) {
+      parts.push(`in ${searchLocation}`);
+    }
+
+    // Guests
+    const totalGuests =
+      guests.adults + guests.children + guests.infants + guests.pets;
+    if (totalGuests > 0) {
+      parts.push(`for ${totalGuests} guest${totalGuests !== 1 ? "s" : ""}`);
+    }
+
+    if (parts.length === 0) return "All Available Apartments";
+
+    return `Available Apartments ${parts.join(" ")}`;
+  };
+
+
+  // Search handler
   const handleSearch = () => {
     setIsSearching(true);
 
-    const totalGuests =
-      guests.adults + guests.children + guests.infants + guests.pets;
-
-    const filtered = allExperiences.filter((item) => {
-      // ✅ Location filter (optional)
+    const filtered = allListings.filter((item) => {
+      // ✅ Location filter (optional now)
       let locationMatch = true;
       if (searchLocation) {
         locationMatch = item.location
@@ -99,17 +172,21 @@ const Experiences = () => {
           .includes(searchLocation.toLowerCase());
       }
 
-      // ✅ Date filter (optional)
+      // ✅ Date filter
       let dateMatch = true;
       if (selectedDate) {
         const start = new Date(item.availabilityStart);
         const end = new Date(item.availabilityEnd);
         const selected = new Date(selectedDate);
+
+        // Check if selected date is within the listing’s available range
         dateMatch = selected >= start && selected <= end;
       }
 
-      // ✅ Guest filter (optional)
+      // ✅ Guest filter
       let guestMatch = true;
+      const totalGuests =
+        guests.adults + guests.children + guests.infants + guests.pets;
       if (totalGuests > 0) {
         const maxGuests = parseInt(item.guestSize, 10) || 0;
         guestMatch = totalGuests <= maxGuests;
@@ -118,19 +195,19 @@ const Experiences = () => {
       return locationMatch && dateMatch && guestMatch;
     });
 
-    setFilteredExperiences(filtered);
+    setFilteredListings(filtered);
     setGuestOpen(false);
   };
 
+
   const handleClearSearch = () => {
     setSearchLocation("");
-    setCheckIn("");
-    setCheckOut("");
+    setSelectedDate("");
     setGuests({ adults: 0, children: 0, infants: 0, pets: 0 });
     setIsSearching(false);
   };
 
-  // Auth + wishlist
+  // Track user login + fetch wishlist
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -152,66 +229,23 @@ const Experiences = () => {
     return () => unsubscribe();
   }, []);
 
+  // Fetch listings
   useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "reviews"));
-        const fetchedReviews = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setReviews(fetchedReviews);
-      } catch (err) {
-        console.error("Error fetching reviews:", err);
-      }
-    };
-
-    fetchReviews();
-  }, []);
-
-
-  useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        // Fetch only experience listings
-        const q = query(
-          collection(db, "listings"),
-          where("category", "==", "experience")
-        );
-        const querySnapshot = await getDocs(q);
-
-        // Extract unique locations from experience category only
-        const locs = Array.from(
-          new Set(querySnapshot.docs.map((doc) => doc.data().location).filter(Boolean))
-        );
-
-        setLocations(locs); // update state
-      } catch (error) {
-        console.error("Error fetching locations:", error);
-      }
-    };
-
-    fetchLocations();
-  }, []);
-
-  // Fetch experiences
-  useEffect(() => {
-    const fetchExperiences = async () => {
+    const fetchListings = async () => {
       const q = query(
         collection(db, "listings"),
         where("status", "==", "published"),
-        where("category", "==", "experience"),
+        where("category", "==", "home"),
         orderBy("createdAt", "desc")
       );
       const querySnapshot = await getDocs(q);
-      const experiences = querySnapshot.docs.map((doc) => ({
+      const listings = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setAllExperiences(experiences); // store everything in one array
+      setAllListings(listings); // store everything in one array
     };
-
-    fetchExperiences();
+    fetchListings();
   }, []);
 
   // Fetch user's bookings and generate suggestions
@@ -219,7 +253,7 @@ const Experiences = () => {
     const fetchUserBookings = async () => {
       if (!user) {
         setUserBookings([]);
-        setSuggestedExperiences([]);
+        setSuggestedListings([]);
         return;
       }
 
@@ -237,12 +271,12 @@ const Experiences = () => {
 
         // Only show suggestions if user has active bookings
         if (bookings.length === 0) {
-          setSuggestedExperiences([]);
+          setSuggestedListings([]);
           return;
         }
 
         // Generate suggestions based on bookings
-        if (allExperiences.length > 0) {
+        if (allListings.length > 0) {
           const bookedListingIds = bookings.map(b => b.listingId);
 
           // Extract locations from bookings (with fallback to empty array)
@@ -266,7 +300,7 @@ const Experiences = () => {
           const suggestionsCount = bookings.length;
 
           // Filter suggestions based on user history
-          let suggestions = allExperiences.filter(listing => {
+          let suggestions = allListings.filter(listing => {
             // Don't suggest already booked listings
             if (bookedListingIds.includes(listing.id)) return false;
 
@@ -295,12 +329,12 @@ const Experiences = () => {
 
           // If not enough personalized suggestions, add random ones to fill the gap
           if (suggestions.length < suggestionsCount) {
-            const availableExperiences = allExperiences.filter(listing =>
+            const availableListings = allListings.filter(listing =>
               !bookedListingIds.includes(listing.id) &&
               !suggestions.find(s => s.id === listing.id)
             );
 
-            const randomSuggestions = availableExperiences
+            const randomSuggestions = availableListings
               .sort(() => Math.random() - 0.5)
               .slice(0, suggestionsCount - suggestions.length);
 
@@ -310,30 +344,28 @@ const Experiences = () => {
           // Limit to exact number of bookings
           suggestions = suggestions.slice(0, suggestionsCount);
 
-          setSuggestedExperiences(suggestions);
+          setSuggestedListings(suggestions);
         } else {
-          setSuggestedExperiences([]);
+          setSuggestedListings([]);
         }
       } catch (error) {
         console.error("Error fetching user bookings:", error);
-        setSuggestedExperiences([]);
+        setSuggestedListings([]);
       }
     };
 
     fetchUserBookings();
-  }, [user, allExperiences]);
+  }, [user, allListings]);
 
 
-  // Wishlist handling
+  // Wishlist handler
   const handleWishlist = async (item) => {
     if (!user) {
       alert("Please log in to add to favorites!");
       navigate("/login");
       return;
     }
-
     const existing = wishlist.find((fav) => fav.name === item.title);
-
     if (existing) {
       await deleteDoc(doc(db, "wishlists", existing.id));
       setWishlist(wishlist.filter((fav) => fav.id !== existing.id));
@@ -342,7 +374,7 @@ const Experiences = () => {
         userId: user.uid,
         name: item.title,
         desc: item.description,
-        price: `₱${item.price.toLocaleString()} / person`,
+        price: `₱${item.price.toLocaleString()} / night`,
         image: item.imageUrl || (item.images && item.images[0]) || "",
         rating: item.rating || "4.5",
       });
@@ -359,24 +391,21 @@ const Experiences = () => {
         {/* Wishlist button */}
         <button
           onClick={(e) => {
-            e.preventDefault(); // prevent Link navigation when clicking heart
+            e.preventDefault();
             handleWishlist(item);
           }}
           className="absolute top-3 right-3 text-2xl z-[9999] pointer-events-auto"
         >
           {isFavorited(item) ? "🧡" : "🤍"}
         </button>
-
         {/* Image */}
         <div className="w-full h-44 rounded-t-2xl overflow-hidden">
           <img
-            src={Array.isArray(item.images) ? item.images[0] : item.imageUrl}
+            src={item.images ? item.images[0] : item.imageUrl}
             alt={item.title}
             className="w-full h-full object-cover"
           />
-
         </div>
-
         {/* Info */}
         <div className="p-5">
           <h3 className="font-bold text-gray-800 text-lg mb-1">{item.title}</h3>
@@ -398,11 +427,9 @@ const Experiences = () => {
                 </p>
               );
             })()}
-
             <p className="font-bold text-gray-800">₱{item.price.toLocaleString()}.00 / night</p>
           </div>
         </div>
-
       </div>
     </Link>
   );
@@ -432,9 +459,38 @@ const Experiences = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Transaction history state
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState([]);
+
+  // Fetch user's transaction history from 'transactions' collection
+  useEffect(() => {
+    if (!user) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+    const fetchTransactions = async () => {
+      setLoading(true);
+      try {
+        const txSnap = await getDocs(query(
+          collection(db, "transactions"),
+          where("userId", "==", user.uid),
+          orderBy("createdAt", "desc")
+        ));
+        const transactions = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setTransactions(transactions);
+      } catch (err) {
+        console.error('Error fetching transactions:', err);
+        setTransactions([]);
+      }
+      setLoading(false);
+    };
+    fetchTransactions();
+  }, [user]);
+
   return (
-    <div className="font-sans bg-[#fefefe] min-h-screen">
-      {/* HEADER */}
+    <div className="font-sans min-h-screen bg-gradient-to-br from-[#fefefe] via-[#f7f8fa] to-[#f3f4f8]">
       <header className="sticky top-0 left-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm z-50">
         <div className="max-w-screen-xl mx-auto flex items-center justify-between px-4 sm:px-12 py-4">
           {/* 🏠 Logo */}
@@ -782,278 +838,184 @@ const Experiences = () => {
           </div>
         )}
       </header>
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div className="text-center mb-16">
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#0B2545] mb-4">
+            Transaction History
+          </h1>
+          <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
+            All your bookings and payments in one place.
+          </p>
+          <div className="w-20 sm:w-24 h-1 bg-gradient-to-r from-orange-500 to-orange-400 mx-auto mt-6 sm:mt-8 rounded-full"></div>
+        </div>
 
-      <>
-        {/* 🔍 Enhanced Search Section */}
-        <section className="mt-10 flex justify-center px-4 sm:px-0 relative z-[50]">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl w-full max-w-5xl px-4 sm:px-6 py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 border border-gray-200 relative">
-
-            {/* Location */}
-            <div ref={locationRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[140px] z-[60]">
-              <button
-                onClick={() => setLocationOpen(!locationOpen)}
-                className="w-full text-left border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">Where</label>
-                <span className="text-sm text-gray-700">
-                  {searchLocation
-                    ? (searchLocation.length > 20
-                      ? searchLocation.slice(0, 20) + "..."
-                      : searchLocation)
-                    : "Select location ▼"}
-                </span>
-              </button>
-
-              {locationOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-64 max-h-80 overflow-y-auto p-2 text-gray-800 top-full left-0">
-                  {/* Search input for filtering */}
-                  <input
-                    type="text"
-                    placeholder="Search locations..."
-                    value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                    className="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-
-                  {/* Clear option */}
-                  <button
-                    onClick={() => {
-                      setSearchLocation("");
-                      setLocationOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Clear selection
-                  </button>
-
-                  {/* Divider */}
-                  <div className="border-t border-gray-200 my-2"></div>
-
-                  {/* Location options */}
-                  {locations
-                    .filter(loc =>
-                      loc.toLowerCase().includes(searchLocation.toLowerCase())
-                    )
-                    .map((loc, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setSearchLocation(loc);
-                          setLocationOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
-                      >
-                        📍 {loc}
-                      </button>
-                    ))}
-
-                  {/* No results message */}
-                  {locations.filter(loc =>
-                    loc.toLowerCase().includes(searchLocation.toLowerCase())
-                  ).length === 0 && searchLocation && (
-                      <div className="px-3 py-4 text-sm text-gray-500 text-center">
-                        No locations found
-                      </div>
-                    )}
-                </div>
-              )}
-            </div>
-
-            {/* Single Date Picker */}
-            <div ref={dateRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[200px]">
-              <button
-                onClick={() => setDateOpen(!dateOpen)}
-                className="w-full text-left border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">When</label>
-                <span className="text-sm text-gray-700">{formatDateDisplay()}</span>
-              </button>
-
-              {dateOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-80 p-6 text-gray-800 top-full left-0">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => handleDateSelect(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full text-gray-700 text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  {selectedDate && (
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={() => setSelectedDate("")}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        Clear date
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Guests Dropdown */}
-            <div ref={guestRef} className="relative flex-1 min-w-[140px]">
-              <button
-                onClick={() => setGuestOpen(!guestOpen)}
-                className="w-full text-left px-4 py-2 border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">Who</label>
-                <span className="text-sm text-gray-700">
-                  {guests.adults + guests.children + guests.infants + guests.pets > 0
-                    ? `${guests.adults + guests.children + guests.infants + guests.pets} guest${guests.adults + guests.children + guests.infants + guests.pets !== 1 ? "s" : ""} ▼`
-                    : "Add guests ▼"}
-                </span>
-              </button>
-
-              {guestOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-56 p-4 text-gray-800 top-full left-0">
-                  {["adults", "children", "infants", "pets"].map((key) => (
-                    <div key={key} className="flex justify-between items-center mb-3 last:mb-0">
-                      <span className="text-sm capitalize">{key}</span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setGuests((prev) => ({ ...prev, [key]: Math.max(0, prev[key] - 1) }))}
-                          className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
-                        >
-                          -
-                        </button>
-                        <span className="w-4 text-center text-sm">{guests[key]}</span>
-                        <button
-                          onClick={() => setGuests((prev) => ({ ...prev, [key]: prev[key] + 1 }))}
-                          className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-              <button
-                onClick={handleSearch}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-md transition w-full sm:w-auto"
-              >
-                Search
-              </button>
-              {isSearching && (
-                <button
-                  onClick={handleClearSearch}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-3 rounded-md transition w-full sm:w-auto"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <svg xmlns="http://www.w3.org/2000/svg" className="animate-spin h-12 w-12 text-orange-400 mb-6" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            <p className="text-center text-gray-500 text-lg font-medium">Loading your transactions...</p>
           </div>
-        </section>
-      </>
-
-      {/* SUGGESTED FOR YOU SECTION */}
-      {user && suggestedExperiences.length > 0 && !isSearching && (
-        <section className="max-w-screen-xl mx-auto mt-14 mb-14 sm:mb-20 px-4 sm:px-6 lg:px-6">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#0B2545]">
-              ✨ Suggested for You
-            </h2>
-            <p className="text-gray-500 text-sm sm:text-base mt-2">
-              Based on your booking history, we think you'll love these experiences
+        ) : transactions.length === 0 ? (
+          <div className="text-center py-20 px-4 sm:px-0 flex flex-col items-center">
+            <img src="https://assets10.lottiefiles.com/packages/lf20_3rwasyjy.json" alt="No transactions" className="w-40 h-40 mx-auto mb-6" style={{ filter: 'grayscale(0.2)' }} onError={e => e.target.style.display = 'none'} />
+            <h3 className="text-3xl font-bold text-gray-700 mb-3">No transactions yet</h3>
+            <p className="text-gray-500 mb-8 text-lg max-w-md mx-auto">
+              Book a home or experience to see your transaction history here.<br />
+              <span className='text-xs text-red-400'>DEBUG: No bookings found for your user. If you believe this is wrong, check your Firestore data and userId.</span>
             </p>
-            <div className="w-24 sm:w-32 border-b-2 border-orange-500 mx-auto mt-4"></div>
+            <Link
+              to="/homes"
+              className="inline-flex items-center px-7 py-3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-semibold rounded-2xl shadow-lg transition-all duration-300 transform hover:scale-[1.04] active:scale-[0.98] text-lg"
+            >
+              Start Exploring
+            </Link>
           </div>
+        ) : (
+          <>
+            {/* Desktop/tablet table view */}
+            <div className="hidden sm:block overflow-x-auto">
+              <div className="bg-white/90 rounded-3xl shadow-2xl p-6 sm:p-10">
+                <table className="min-w-full rounded-2xl text-base">
+                  <thead className="sticky top-0 z-10 bg-gray-100/95 backdrop-blur border-b border-gray-200">
+                    <tr className="text-gray-700 text-base">
+                      <th className="py-4 px-4 text-left font-semibold">Date</th>
+                      <th className="py-4 px-4 text-left font-semibold">Category</th>
+                      <th className="py-4 px-4 text-left font-semibold">Listing</th>
+                      <th className="py-4 px-4 text-left font-semibold">Check-in</th>
+                      <th className="py-4 px-4 text-left font-semibold">Check-out</th>
+                      <th className="py-4 px-4 text-left font-semibold">Guests</th>
+                      <th className="py-4 px-4 text-left font-semibold">Total Paid</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map((tx, idx) => {
+                      // Icon for category
+                      let catIcon = null;
+                      const cat = (tx.category || tx.type || "").toLowerCase();
+                      if (cat.includes("home")) catIcon = <svg className="inline w-5 h-5 mr-1 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M4 10v10a1 1 0 001 1h3m10-11v11a1 1 0 01-1 1h-3m-4 0h4" /></svg>;
+                      else if (cat.includes("experience")) catIcon = <svg className="inline w-5 h-5 mr-1 text-pink-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>;
+                      else if (cat.includes("service")) catIcon = <svg className="inline w-5 h-5 mr-1 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>;
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
-            {suggestedExperiences.map((item) => renderCard(item))}
-          </div>
-        </section>
-      )}
-
-      {/* LISTINGS: show all experiences by default; show filtered when searching */}
-      {!isSearching ? (
-        <>
-          {/* EXPERIENCES */}
-          <section className="max-w-screen-xl mx-auto mt-14 mb-14 sm:mb-20 px-4 sm:px-6 lg:px-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
-              {allExperiences.length > 0 ? (
-                allExperiences.map((item) => renderCard(item))
-              ) : (
-                <div className="col-span-full text-center text-gray-500">
-                  No experiences available.
-                </div>
-              )}
+                      return (
+                        <tr key={tx.id} className={`border-b last:border-b-0 transition-all ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/80'} hover:bg-orange-50/60`}>
+                          {/* Date */}
+                          <td className="py-4 px-4 font-medium text-gray-700">
+                            {tx.createdAt && tx.createdAt.seconds
+                              ? new Date(tx.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                              : tx.createdAt
+                                ? new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                : "-"}
+                          </td>
+                          {/* Category */}
+                          <td className="py-4 px-4 capitalize font-semibold text-gray-800">
+                            {catIcon}{tx.category || tx.type || "-"}
+                          </td>
+                          {/* Listing */}
+                          <td className="py-4 px-4">
+                            <span className="text-orange-600 font-semibold">
+                              {tx.listingTitle || tx.title || "-"}
+                            </span>
+                          </td>
+                          {/* Check-in */}
+                          <td className="py-4 px-4">
+                            {tx.checkIn && (tx.checkIn.seconds
+                              ? new Date(tx.checkIn.seconds * 1000)
+                              : new Date(tx.checkIn)
+                            ).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </td>
+                          {/* Check-out */}
+                          <td className="py-4 px-4">
+                            {tx.checkOut && (tx.checkOut.seconds
+                              ? new Date(tx.checkOut.seconds * 1000)
+                              : new Date(tx.checkOut)
+                            ).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                          </td>
+                          {/* Guests */}
+                          <td className="pl-8">
+                            {(() => {
+                              if (tx.guests) {
+                                const total = (tx.guests.adults || 0) + (tx.guests.children || 0) + (tx.guests.infants || 0) + (tx.guests.pets || 0);
+                                return total;
+                              } else if (typeof tx.total !== 'undefined') {
+                                return tx.total;
+                              } else if (typeof tx.guests === 'number') {
+                                return tx.guests;
+                              } else {
+                                return 0;
+                              }
+                            })()}
+                          </td>
+                          {/* Total Paid */}
+                          <td className="py-4 pl-5 font-bold text-green-600">
+                            {typeof tx.finalPrice !== 'undefined' || typeof tx.price !== 'undefined' || typeof tx.amount !== 'undefined'
+                              ? `₱${(tx.finalPrice || tx.price || tx.amount || 0).toLocaleString()}.00`
+                              : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </section>
-        </>
-      ) : (
-        // Search results view
-        <section className="max-w-screen-xl mx-auto mt-14 mb-14 sm:mb-20 px-4 sm:px-6 lg:px-6">
-          {/* Dynamic search header */}
-          {(() => {
-            const totalGuests = guests.adults + guests.children + guests.infants + guests.pets;
-            const headerParts = [];
+            {/* Mobile card view */}
+            <div className="sm:hidden space-y-6">
+              {transactions.map((tx, idx) => {
+                let catIcon = null;
+                const cat = (tx.category || tx.type || "").toLowerCase();
+                if (cat.includes("home")) catIcon = <svg className="inline w-5 h-5 mr-1 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M4 10v10a1 1 0 001 1h3m10-11v11a1 1 0 01-1 1h-3m-4 0h4" /></svg>;
+                else if (cat.includes("experience")) catIcon = <svg className="inline w-5 h-5 mr-1 text-pink-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>;
+                else if (cat.includes("service")) catIcon = <svg className="inline w-5 h-5 mr-1 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>;
 
-            // Date (optional)
-            if (selectedDate) {
-              headerParts.push(
-                `on ${new Date(selectedDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}`
-              );
-            }
-
-            // Location (optional, shorten if too long)
-            if (searchLocation) {
-              const maxLength = 40; // max characters
-              const shortLocation =
-                searchLocation.length > maxLength
-                  ? searchLocation.slice(0, maxLength) + "..."
-                  : searchLocation;
-              headerParts.push(`in ${shortLocation}`);
-            }
-
-            // Guests (optional)
-            if (totalGuests > 0) {
-              headerParts.push(`for ${totalGuests} guest${totalGuests > 1 ? "s" : ""}`);
-            }
-
-            const headerText = headerParts.length > 0
-              ? `Available Experiences ${headerParts.join(" ")}`
-              : "Available Experiences";
-
-            return (
-              <div className="text-center mb-8">
-                <h2 className="text-2xl sm:text-3xl font-bold text-[#0B2545]">{headerText}</h2>
-                <p className="text-gray-500 text-sm sm:text-base mt-2">
-                  Browse experiences that match your selected filters.
-                </p>
-                <div className="w-24 sm:w-32 border-b-2 border-orange-500 mx-auto mt-4"></div>
-              </div>
-            );
-          })()}
-
-          {/* Listings grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 justify-items-center">
-            {filteredExperiences.length > 0 ? (
-              filteredExperiences.map((item) => renderCard(item))
-            ) : (
-              <div className="col-span-full text-center text-gray-500">
-                No experiences found{searchLocation ? ` for ${searchLocation}` : ""}.
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* 🦶 FOOTER */}
-      <footer className="bg-gray-900 text-gray-300 py-14 px-8 md:px-16">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
-          {/* 🏠 Brand Section */}
+                return (
+                  <div key={tx.id} className="rounded-2xl shadow-lg bg-white/90 p-5 flex flex-col gap-2 border border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-500">{tx.createdAt && tx.createdAt.seconds
+                        ? new Date(tx.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : tx.createdAt
+                          ? new Date(tx.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          : "-"}</span>
+                      <span className="capitalize font-semibold text-gray-800 flex items-center gap-1">{catIcon}{tx.category || tx.type || "-"}</span>
+                    </div>
+                    <div className="text-orange-600 font-semibold text-lg mb-1">{tx.listingTitle || tx.title || "-"}</div>
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-600 mb-2">
+                      <div><span className="font-semibold text-gray-500">Check-in:</span> {tx.checkIn && (tx.checkIn.seconds
+                        ? new Date(tx.checkIn.seconds * 1000)
+                        : new Date(tx.checkIn)
+                      ).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                      <div><span className="font-semibold text-gray-500">Check-out:</span> {tx.checkOut && (tx.checkOut.seconds
+                        ? new Date(tx.checkOut.seconds * 1000)
+                        : new Date(tx.checkOut)
+                      ).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                      <div><span className="font-semibold text-gray-500">Guests:</span> {(() => {
+                        if (tx.guests) {
+                          const total = (tx.guests.adults || 0) + (tx.guests.children || 0) + (tx.guests.infants || 0) + (tx.guests.pets || 0);
+                          return total;
+                        } else if (typeof tx.total !== 'undefined') {
+                          return tx.total;
+                        } else if (typeof tx.guests === 'number') {
+                          return tx.guests;
+                        } else {
+                          return 0;
+                        }
+                      })()}</div>
+                    </div>
+                    <div className="font-bold text-green-600 text-lg">{typeof tx.finalPrice !== 'undefined' || typeof tx.price !== 'undefined' || typeof tx.amount !== 'undefined'
+                      ? `₱${(tx.finalPrice || tx.price || tx.amount || 0).toLocaleString()}.00`
+                      : '-'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </main><br></br>
+      {/* FOOTER */}
+      <footer className="bg-gray-900 text-gray-300 py-10 sm:py-14 px-4 sm:px-6 lg:px-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10">
+          {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <img src={logo} alt="Homezy" className="w-8 h-8" />
@@ -1063,82 +1025,49 @@ const Experiences = () => {
               Helping travelers feel at home, anywhere.
             </p>
 
-            {/* 🌐 Social Media Icons */}
             <div className="flex gap-3">
-              {/* Facebook */}
-              <a
-                href="https://www.facebook.com/paoloperalta246"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  className="w-4 h-4 text-white"
-                >
+              {/* Social Icons */}
+              <a href="https://www.facebook.com/paoloperalta246" target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4 text-white">
                   <path d="M22 12c0-5.52-4.48-10-10-10S2 
-                  6.48 2 12c0 4.99 3.66 9.12 8.44 
-                  9.88v-6.99H8.9v-2.89h1.54V9.8c0-1.52.9-2.36 
-                  2.28-2.36.66 0 1.35.12 1.35.12v1.48h-.76c-.75 
-                  0-.98.47-.98.95v1.14h1.67l-.27 2.89h-1.4v6.99C18.34 
-                  21.12 22 16.99 22 12z" />
+            6.48 2 12c0 4.99 3.66 9.12 8.44 
+            9.88v-6.99H8.9v-2.89h1.54V9.8c0-1.52.9-2.36 
+            2.28-2.36.66 0 1.35.12 1.35.12v1.48h-.76c-.75 
+            0-.98.47-.98.95v1.14h1.67l-.27 2.89h-1.4v6.99C18.34 
+            21.12 22 16.99 22 12z" />
                 </svg>
               </a>
 
-              {/* Instagram */}
-              <a
-                href="https://www.instagram.com/onlysuhi_/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  className="w-4 h-4 text-white"
-                >
+              <a href="https://www.instagram.com/onlysuhi_/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4 text-white">
                   <path d="M7.5 2C4.47 2 2 4.47 2 
-                  7.5v9C2 19.53 4.47 22 7.5 22h9c3.03 
-                  0 5.5-2.47 5.5-5.5v-9C22 4.47 19.53 
-                  2 16.5 2h-9zM12 8.5A3.5 3.5 0 1 1 8.5 
-                  12 3.5 3.5 0 0 1 12 8.5zm5.25-.75a.75.75 
-                  0 1 1-.75-.75.75.75 0 0 1 .75.75zM12 
-                  10a2 2 0 1 0 2 2 2 2 0 0 0-2-2z" />
+            7.5v9C2 19.53 4.47 22 7.5 22h9c3.03 
+            0 5.5-2.47 5.5-5.5v-9C22 4.47 19.53 
+            2 16.5 2h-9zM12 8.5A3.5 3.5 0 1 1 8.5 
+            12 3.5 3.5 0 0 1 12 8.5zm5.25-.75a.75.75 
+            0 1 1-.75-.75.75.75 0 0 1 .75.75zM12 
+            10a2 2 0 1 0 2 2 2 2 0 0 0-2-2z" />
                 </svg>
               </a>
 
-              {/* Twitter/X */}
-              <a
-                href="https://twitter.com/onlysuhi_"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  className="w-4 h-4 text-white"
-                >
+              <a href="https://twitter.com/onlysuhi_" target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-gray-700 hover:bg-orange-500 rounded-full flex items-center justify-center transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" className="w-4 h-4 text-white">
                   <path d="M22.46 6c-.77.35-1.6.58-2.46.69a4.27 
-                  4.27 0 0 0 1.88-2.37 8.58 8.58 0 0 1-2.72 
-                  1.04 4.26 4.26 0 0 0-7.26 3.88A12.1 
-                  12.1 0 0 1 3.15 4.6a4.25 4.25 0 0 0 
-                  1.32 5.68 4.27 4.27 0 0 1-1.93-.54v.05a4.26 
-                  4.26 0 0 0 3.42 4.18 4.27 4.27 0 0 1-1.92.07 
-                  4.26 4.26 0 0 0 3.97 2.95A8.54 8.54 0 0 1 2 
-                  19.54a12.07 12.07 0 0 0 6.56 1.92c7.88 
-                  0 12.2-6.53 12.2-12.2 0-.19 0-.37-.01-.56A8.74 
-                  8.74 0 0 0 22.46 6z" />
+            4.27 0 0 0 1.88-2.37 8.58 8.58 0 0 1-2.72 
+            1.04 4.26 4.26 0 0 0-7.26 3.88A12.1 
+            12.1 0 0 1 3.15 4.6a4.25 4.25 0 0 0 
+            1.32 5.68 4.27 4.27 0 0 1-1.93-.54v.05a4.26 
+            4.26 0 0 0 3.42 4.18 4.27 4.27 0 0 1-1.92.07 
+            4.26 4.26 0 0 0 3.97 2.95A8.54 8.54 0 0 1 2 
+            19.54a12.07 12.07 0 0 0 6.56 1.92c7.88 
+            0 12.2-6.53 12.2-12.2 0-.19 0-.37-.01-.56A8.74 
+            8.74 0 0 0 22.46 6z" />
                 </svg>
               </a>
             </div>
           </div>
 
-          {/* 📦 Company */}
+          {/* Company */}
           <div>
             <h3 className="text-white font-semibold mb-4">Company</h3>
             <ul className="space-y-2 text-sm">
@@ -1149,7 +1078,7 @@ const Experiences = () => {
             </ul>
           </div>
 
-          {/* 🗺️ Destinations */}
+          {/* Destinations */}
           <div>
             <h3 className="text-white font-semibold mb-4">Destinations</h3>
             <ul className="space-y-2 text-sm">
@@ -1160,18 +1089,12 @@ const Experiences = () => {
             </ul>
           </div>
 
-          {/* 📰 Newsletter */}
+          {/* Newsletter */}
           <div>
             <h3 className="text-white font-semibold mb-4">Join Our Newsletter</h3>
-            <div className="flex">
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="px-3 py-2 w-full rounded-l-md text-gray-700 focus:outline-none"
-              />
-              <button className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-r-md text-white font-semibold">
-                Subscribe
-              </button>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+              <input type="email" placeholder="Your email address" className="px-3 py-2 w-full rounded-md sm:rounded-l-md text-gray-700 focus:outline-none" />
+              <button className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-md sm:rounded-r-md text-white font-semibold">Subscribe</button>
             </div>
             <p className="text-xs text-gray-400 mt-2 leading-relaxed">
               * We’ll send you weekly updates for your better tour packages.
@@ -1180,12 +1103,13 @@ const Experiences = () => {
         </div>
 
         {/* © Bottom Text */}
-        <div className="border-t border-gray-700 mt-10 pt-5 text-center text-sm text-gray-500">
+        <div className="border-t border-gray-700 mt-8 sm:mt-10 pt-5 text-center text-sm text-gray-500">
           © 2025 Homezy | All Rights Reserved
         </div>
       </footer>
+
     </div>
   );
 };
 
-export default Experiences;
+export default TransactionHistory;

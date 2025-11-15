@@ -30,6 +30,8 @@ import Compliance from './components/Guest View/Compliance';
 import AdminDashboard from './components/Admin View/AdminDashboard';
 import HostNotifications from './components/Host View/HostNotifications';
 import GuestNotifications from './components/Guest View/GuestNotifications';
+import TransactionHistory from './components/Guest View/TransactionHistory';
+import GuestWishlist from './components/Guest View/GuestWishlist';
 
 function App() {
   return (
@@ -65,6 +67,8 @@ function App() {
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/host-notifications" element={<HostNotifications />} />
         <Route path="/guest-notifications" element={<GuestNotifications />} />
+        <Route path="/transaction-history" element={<TransactionHistory />} />
+        <Route path="/guest-wishlist" element={<GuestWishlist />} />
       </Routes>
     </Router>
   );

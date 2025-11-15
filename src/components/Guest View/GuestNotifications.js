@@ -17,7 +17,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Bell, XCircle } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell, XCircle, History, Star } from "lucide-react";
 
 const GuestNotifications = () => {
   const location = useLocation();
@@ -226,14 +226,14 @@ const GuestNotifications = () => {
             id: doc.id,
             ...doc.data()
           }));
-          
+
           // Sort by timestamp manually (newest first)
           notifs.sort((a, b) => {
             const timeA = a.timestamp?.seconds || 0;
             const timeB = b.timestamp?.seconds || 0;
             return timeB - timeA;
           });
-          
+
           console.log("Guest notifications fetched:", notifs);
           console.log("Current user ID:", currentUser.uid);
           setGuestNotifications(notifs);
@@ -256,7 +256,7 @@ const GuestNotifications = () => {
           console.error("Error fetching notifications:", error);
           setLoadingNotifs(false);
         });
-        
+
         // Store unsubscribe function to clean up later
         return () => {
           unsubNotif();
@@ -677,6 +677,13 @@ const GuestNotifications = () => {
                         Profile Settings
                       </Link>
                       <Link
+                        to="/transaction-history"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <History className="w-4 h-4 text-orange-500" />
+                        Transaction History
+                      </Link>
+                      <Link
                         to="/bookings"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
@@ -694,8 +701,15 @@ const GuestNotifications = () => {
                         to="/favorites"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
-                        <Heart className="w-4 h-4 text-orange-500" />
+                        <Star className="w-4 h-4 text-orange-500" />
                         Favorites
+                      </Link>
+                      <Link
+                        to="/guest-wishlist"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <Heart className="w-4 h-4 text-orange-500" />
+                        Wishlist
                       </Link>
                     </div>
 
@@ -772,6 +786,13 @@ const GuestNotifications = () => {
                     <User className="w-4 h-4 text-orange-500" /> Profile Settings
                   </Link>
                   <Link
+                    to="/transaction-history"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <History className="w-4 h-4 text-orange-500" /> Transaction History
+                  </Link>
+                  <Link
                     to="/bookings"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
@@ -790,9 +811,15 @@ const GuestNotifications = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
                   >
-                    <Heart className="w-4 h-4 text-orange-500" /> Favorites
+                    <Star className="w-4 h-4 text-orange-500" /> Favorites
                   </Link>
-
+                  <Link
+                    to="/guest-wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Heart className="w-4 h-4 text-orange-500" /> Wishlist
+                  </Link>
                   <button
                     onClick={async () => {
                       await signOut(auth);
@@ -863,29 +890,26 @@ const GuestNotifications = () => {
                       {newNotifs.map((notif, index) => (
                         <div
                           key={notif.id}
-                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${
-                            notif.type === 'booking_approved' 
-                              ? 'border-green-200 hover:border-green-400' 
+                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${notif.type === 'booking_approved'
+                              ? 'border-green-200 hover:border-green-400'
                               : 'border-red-200 hover:border-red-400'
-                          }`}
+                            }`}
                           style={{ animationDelay: `${index * 50}ms` }}
                         >
                           {/* Gradient accent bar */}
-                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${
-                            notif.type === 'booking_approved'
+                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${notif.type === 'booking_approved'
                               ? 'from-green-400 to-green-600'
                               : 'from-red-400 to-red-600'
-                          }`}></div>
-                          
+                            }`}></div>
+
                           <div className="p-6 pl-8">
                             <div className="flex items-start justify-between gap-4">
                               {/* Icon and Content */}
                               <div className="flex items-start gap-4 flex-1">
-                                <div className={`p-3 rounded-xl flex-shrink-0 ${
-                                  notif.type === 'booking_approved'
+                                <div className={`p-3 rounded-xl flex-shrink-0 ${notif.type === 'booking_approved'
                                     ? 'bg-gradient-to-br from-green-100 to-green-200'
                                     : 'bg-gradient-to-br from-red-100 to-red-200'
-                                }`}>
+                                  }`}>
                                   {notif.type === 'booking_approved' ? (
                                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -894,7 +918,7 @@ const GuestNotifications = () => {
                                     <XCircle className="w-6 h-6 text-red-600" />
                                   )}
                                 </div>
-                                
+
                                 <div className="flex-1">
                                   <h3 className="font-bold text-gray-900 text-lg mb-2">
                                     {notif.title}
@@ -948,29 +972,26 @@ const GuestNotifications = () => {
                       {oldNotifs.map((notif, index) => (
                         <div
                           key={notif.id}
-                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${
-                            notif.type === 'booking_approved' 
-                              ? 'border-green-200 hover:border-green-400' 
+                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${notif.type === 'booking_approved'
+                              ? 'border-green-200 hover:border-green-400'
                               : 'border-red-200 hover:border-red-400'
-                          }`}
+                            }`}
                           style={{ animationDelay: `${index * 50}ms` }}
                         >
                           {/* Gradient accent bar */}
-                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${
-                            notif.type === 'booking_approved'
+                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${notif.type === 'booking_approved'
                               ? 'from-green-400 to-green-600'
                               : 'from-red-400 to-red-600'
-                          }`}></div>
-                          
+                            }`}></div>
+
                           <div className="p-6 pl-8">
                             <div className="flex items-start justify-between gap-4">
                               {/* Icon and Content */}
                               <div className="flex items-start gap-4 flex-1">
-                                <div className={`p-3 rounded-xl flex-shrink-0 ${
-                                  notif.type === 'booking_approved'
+                                <div className={`p-3 rounded-xl flex-shrink-0 ${notif.type === 'booking_approved'
                                     ? 'bg-gradient-to-br from-green-100 to-green-200'
                                     : 'bg-gradient-to-br from-red-100 to-red-200'
-                                }`}>
+                                  }`}>
                                   {notif.type === 'booking_approved' ? (
                                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -979,7 +1000,7 @@ const GuestNotifications = () => {
                                     <XCircle className="w-6 h-6 text-red-600" />
                                   )}
                                 </div>
-                                
+
                                 <div className="flex-1">
                                   <h3 className="font-bold text-gray-900 text-lg mb-2">
                                     {notif.title}

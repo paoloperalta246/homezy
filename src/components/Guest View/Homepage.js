@@ -22,7 +22,7 @@ import cresmont from "./images/cresmont.png";
 import greenbelt from "./images/greenbelt.png";
 import rise from "./images/rise.png";
 import mountain from "./images/mountain.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Menu, X, Bell } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Menu, X, Bell, History, Star } from "lucide-react";
 
 export default function Homepage() {
   const [scrolled, setScrolled] = useState(false);
@@ -224,6 +224,14 @@ export default function Homepage() {
                     </Link>
 
                     <Link
+                        to="/transaction-history"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <History className="w-4 h-4 text-orange-500" />
+                        Transaction History
+                      </Link>
+
+                    <Link
                       to="/bookings"
                       className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                     >
@@ -243,8 +251,15 @@ export default function Homepage() {
                       to="/favorites"
                       className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                     >
-                      <Heart className="w-4 h-4 text-orange-500" />
+                      <Star className="w-4 h-4 text-orange-500" />
                       Favorites
+                    </Link>
+                    <Link
+                      to="/guest-wishlist"
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      <Heart className="w-4 h-4 text-orange-500" />
+                      Wishlist
                     </Link>
                   </div>
 
@@ -298,7 +313,10 @@ export default function Homepage() {
                     <Bell className="w-4 h-4 text-orange-500" /> Notifications
                   </Link>
                   <Link to="/guest-profile" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-orange-500" /> Profile
+                    <User className="w-4 h-4 text-orange-500" /> Profile Settings
+                  </Link>
+                  <Link to="/transaction-history" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-orange-500" /> Transaction History
                   </Link>
                   <Link to="/bookings" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-orange-500" /> Bookings
@@ -307,7 +325,10 @@ export default function Homepage() {
                     <MessageCircle className="w-4 h-4 text-orange-500" /> Messages
                   </Link>
                   <Link to="/favorites" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-orange-500" /> Favorites
+                    <Star className="w-4 h-4 text-orange-500" /> Favorites
+                  </Link>
+                  <Link to="/guest-wishlist" onClick={() => setMenuOpen(false)} className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-orange-500" /> Wishlist
                   </Link>
 
                   <button

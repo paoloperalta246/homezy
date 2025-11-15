@@ -8,7 +8,7 @@ import logo from "./homezy-logo.png";
 import defaultProfile from "./images/default-profile.png";
 import { User, Calendar, Heart, LogOut, MessageCircle, Bell, History, Star } from "lucide-react";
 
-const Favorites = () => {
+const GuestWishlist = () => {
   const [user, setUser] = useState(null);
   const [wishlist, setWishlist] = useState([]);
   const navigate = useNavigate();
@@ -283,12 +283,12 @@ const Favorites = () => {
                         Favorites
                       </Link>
                       <Link
-                        to="/guest-wishlist"
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
-                      >
-                        <Heart className="w-4 h-4 text-orange-500" />
-                        Wishlist
-                      </Link>
+                      to="/guest-wishlist"
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      <Heart className="w-4 h-4 text-orange-500" />
+                      Wishlist
+                    </Link>
                     </div>
 
                     <div className="border-t border-gray-100 py-2">
@@ -398,6 +398,7 @@ const Favorites = () => {
                   >
                     <Heart className="w-4 h-4 text-orange-500" /> Wishlist
                   </Link>
+
                   <button
                     onClick={async () => {
                       await signOut(auth);
@@ -428,9 +429,9 @@ const Favorites = () => {
       {/* ⭐ MAIN CONTENT (Bookings.js style) */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 md:px-6 py-10 md:py-16">
         <div className="text-center mb-12 md:mb-16">
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#0B2545] mb-4">My Favorites</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#0B2545] mb-4">My Wishlist</h1>
           <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
-            All the homes and experiences you’ve saved for later.
+            Set the listings you want to see in the future
           </p>
           <div className="w-20 sm:w-24 h-1 bg-gradient-to-r from-orange-500 to-orange-400 mx-auto mt-6 sm:mt-8 rounded-full"></div>
         </div>
@@ -439,11 +440,9 @@ const Favorites = () => {
         {wishlist.length === 0 ? (
           <div className="text-center py-12 sm:py-16">
             <div className="mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 sm:h-16 w-12 sm:w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-              </svg>
+              <Heart className="mx-auto h-12 sm:h-16 w-12 sm:w-16 text-gray-400" />
             </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No favorites yet</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No wishlists yet</h3>
             <p className="text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base">
               Browse homes and experiences, then tap the heart icon to save your favorites.
             </p>
@@ -597,4 +596,4 @@ const Favorites = () => {
   );
 };
 
-export default Favorites;
+export default GuestWishlist;

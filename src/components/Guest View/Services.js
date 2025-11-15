@@ -15,7 +15,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Bell } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell, History, Star } from "lucide-react";
 
 const Services = () => {
   const location = useLocation();
@@ -240,22 +240,22 @@ const Services = () => {
         // Generate suggestions based on bookings
         if (allServices.length > 0) {
           const bookedListingIds = bookings.map(b => b.listingId);
-          
+
           // Extract locations from bookings (with fallback to empty array)
           const bookedLocations = [...new Set(
             bookings
               .map(b => b.location)
               .filter(loc => loc && loc.trim() !== "")
           )];
-          
+
           // Extract prices (prefer finalPrice, fallback to price)
           const bookedPrices = bookings
             .map(b => b.finalPrice || b.price || 0)
             .filter(price => price > 0);
-          
+
           // Calculate average price only if we have valid prices
-          const avgPrice = bookedPrices.length > 0 
-            ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length 
+          const avgPrice = bookedPrices.length > 0
+            ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length
             : 0;
 
           // Number of suggestions = number of bookings (1 booking = 1 suggestion, etc.)
@@ -267,13 +267,13 @@ const Services = () => {
             if (bookedListingIds.includes(listing.id)) return false;
 
             // Check location match
-            const locationMatch = bookedLocations.length > 0 && bookedLocations.some(loc => 
+            const locationMatch = bookedLocations.length > 0 && bookedLocations.some(loc =>
               listing.location?.toLowerCase().includes(loc?.toLowerCase())
             );
 
             // Check price match (±30% range) - only if we have average price
-            const priceMatch = avgPrice > 0 && 
-              listing.price >= avgPrice * 0.7 && 
+            const priceMatch = avgPrice > 0 &&
+              listing.price >= avgPrice * 0.7 &&
               listing.price <= avgPrice * 1.3;
 
             // Return true if either location or price matches
@@ -284,22 +284,22 @@ const Services = () => {
             } else if (avgPrice > 0) {
               return priceMatch;
             }
-            
+
             // If no filtering criteria, include this listing
             return true;
           });
 
           // If not enough personalized suggestions, add random ones to fill the gap
           if (suggestions.length < suggestionsCount) {
-            const availableServices = allServices.filter(listing => 
-              !bookedListingIds.includes(listing.id) && 
+            const availableServices = allServices.filter(listing =>
+              !bookedListingIds.includes(listing.id) &&
               !suggestions.find(s => s.id === listing.id)
             );
-            
+
             const randomSuggestions = availableServices
               .sort(() => Math.random() - 0.5)
               .slice(0, suggestionsCount - suggestions.length);
-            
+
             suggestions = [...suggestions, ...randomSuggestions];
           }
 
@@ -607,6 +607,13 @@ const Services = () => {
                         Profile Settings
                       </Link>
                       <Link
+                        to="/transaction-history"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <History className="w-4 h-4 text-orange-500" />
+                        Transaction History
+                      </Link>
+                      <Link
                         to="/bookings"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
@@ -624,8 +631,15 @@ const Services = () => {
                         to="/favorites"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
-                        <Heart className="w-4 h-4 text-orange-500" />
+                        <Star className="w-4 h-4 text-orange-500" />
                         Favorites
+                      </Link>
+                      <Link
+                        to="/guest-wishlist"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <Heart className="w-4 h-4 text-orange-500" />
+                        Wishlist
                       </Link>
                     </div>
 
@@ -702,6 +716,13 @@ const Services = () => {
                     <User className="w-4 h-4 text-orange-500" /> Profile Settings
                   </Link>
                   <Link
+                    to="/transaction-history"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <History className="w-4 h-4 text-orange-500" /> Transaction History
+                  </Link>
+                  <Link
                     to="/bookings"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
@@ -720,9 +741,15 @@ const Services = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
                   >
-                    <Heart className="w-4 h-4 text-orange-500" /> Favorites
+                    <Star className="w-4 h-4 text-orange-500" /> Favorites
                   </Link>
-
+                  <Link
+                    to="/guest-wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Heart className="w-4 h-4 text-orange-500" /> Wishlist
+                  </Link>
                   <button
                     onClick={async () => {
                       await signOut(auth);
@@ -763,10 +790,10 @@ const Services = () => {
               >
                 <label className="text-sm font-semibold text-gray-700 block">Where</label>
                 <span className="text-sm text-gray-700">
-                  {searchLocation 
-                    ? (searchLocation.length > 20 
-                        ? searchLocation.slice(0, 20) + "..." 
-                        : searchLocation)
+                  {searchLocation
+                    ? (searchLocation.length > 20
+                      ? searchLocation.slice(0, 20) + "..."
+                      : searchLocation)
                     : "Select location ▼"}
                 </span>
               </button>
@@ -781,7 +808,7 @@ const Services = () => {
                     onChange={(e) => setSearchLocation(e.target.value)}
                     className="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
-                  
+
                   {/* Clear option */}
                   <button
                     onClick={() => {
@@ -798,7 +825,7 @@ const Services = () => {
 
                   {/* Location options */}
                   {locations
-                    .filter(loc => 
+                    .filter(loc =>
                       loc.toLowerCase().includes(searchLocation.toLowerCase())
                     )
                     .map((loc, index) => (
@@ -813,15 +840,15 @@ const Services = () => {
                         📍 {loc}
                       </button>
                     ))}
-                  
+
                   {/* No results message */}
-                  {locations.filter(loc => 
+                  {locations.filter(loc =>
                     loc.toLowerCase().includes(searchLocation.toLowerCase())
                   ).length === 0 && searchLocation && (
-                    <div className="px-3 py-4 text-sm text-gray-500 text-center">
-                      No locations found
-                    </div>
-                  )}
+                      <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                        No locations found
+                      </div>
+                    )}
                 </div>
               )}
             </div>

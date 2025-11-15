@@ -15,7 +15,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Bell } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Bell, History, Star } from "lucide-react";
 
 const Homes = () => {
   const location = useLocation();
@@ -271,22 +271,22 @@ const Homes = () => {
         // Generate suggestions based on bookings
         if (allListings.length > 0) {
           const bookedListingIds = bookings.map(b => b.listingId);
-          
+
           // Extract locations from bookings (with fallback to empty array)
           const bookedLocations = [...new Set(
             bookings
               .map(b => b.location)
               .filter(loc => loc && loc.trim() !== "")
           )];
-          
+
           // Extract prices (prefer finalPrice, fallback to price)
           const bookedPrices = bookings
             .map(b => b.finalPrice || b.price || 0)
             .filter(price => price > 0);
-          
+
           // Calculate average price only if we have valid prices
-          const avgPrice = bookedPrices.length > 0 
-            ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length 
+          const avgPrice = bookedPrices.length > 0
+            ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length
             : 0;
 
           // Number of suggestions = number of bookings (1 booking = 1 suggestion, etc.)
@@ -298,13 +298,13 @@ const Homes = () => {
             if (bookedListingIds.includes(listing.id)) return false;
 
             // Check location match
-            const locationMatch = bookedLocations.length > 0 && bookedLocations.some(loc => 
+            const locationMatch = bookedLocations.length > 0 && bookedLocations.some(loc =>
               listing.location?.toLowerCase().includes(loc?.toLowerCase())
             );
 
             // Check price match (±30% range) - only if we have average price
-            const priceMatch = avgPrice > 0 && 
-              listing.price >= avgPrice * 0.7 && 
+            const priceMatch = avgPrice > 0 &&
+              listing.price >= avgPrice * 0.7 &&
               listing.price <= avgPrice * 1.3;
 
             // Return true if either location or price matches
@@ -315,22 +315,22 @@ const Homes = () => {
             } else if (avgPrice > 0) {
               return priceMatch;
             }
-            
+
             // If no filtering criteria, include this listing
             return true;
           });
 
           // If not enough personalized suggestions, add random ones to fill the gap
           if (suggestions.length < suggestionsCount) {
-            const availableListings = allListings.filter(listing => 
-              !bookedListingIds.includes(listing.id) && 
+            const availableListings = allListings.filter(listing =>
+              !bookedListingIds.includes(listing.id) &&
               !suggestions.find(s => s.id === listing.id)
             );
-            
+
             const randomSuggestions = availableListings
               .sort(() => Math.random() - 0.5)
               .slice(0, suggestionsCount - suggestions.length);
-            
+
             suggestions = [...suggestions, ...randomSuggestions];
           }
 
@@ -545,7 +545,7 @@ const Homes = () => {
               </button>
             )}
 
-            {/* 👤 User Dropdown */ }
+            {/* 👤 User Dropdown */}
             <div className="relative">
               <button
                 ref={dropdownButtonRef}
@@ -632,6 +632,13 @@ const Homes = () => {
                         Profile Settings
                       </Link>
                       <Link
+                        to="/transaction-history"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <History className="w-4 h-4 text-orange-500" />
+                        Transaction History
+                      </Link>
+                      <Link
                         to="/bookings"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
@@ -649,8 +656,15 @@ const Homes = () => {
                         to="/favorites"
                         className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                       >
-                        <Heart className="w-4 h-4 text-orange-500" />
+                        <Star className="w-4 h-4 text-orange-500" />
                         Favorites
+                      </Link>
+                      <Link
+                        to="/guest-wishlist"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <Heart className="w-4 h-4 text-orange-500" />
+                        Wishlist
                       </Link>
                     </div>
 
@@ -670,10 +684,10 @@ const Homes = () => {
                   </div>
                 </DropdownPortal>
               )}
-            </div>            
+            </div>
           </div>
         </div>
-        
+
         {/* 📱 Mobile Menu Dropdown */}
         {mobileMenuOpen && (
           <div className="sm:hidden bg-white border-t border-gray-100 shadow-md">
@@ -727,6 +741,13 @@ const Homes = () => {
                     <User className="w-4 h-4 text-orange-500" /> Profile Settings
                   </Link>
                   <Link
+                    to="/transaction-history"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <History className="w-4 h-4 text-orange-500" /> Transaction History
+                  </Link>
+                  <Link
                     to="/bookings"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
@@ -745,9 +766,15 @@ const Homes = () => {
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
                   >
-                    <Heart className="w-4 h-4 text-orange-500" /> Favorites
+                    <Star className="w-4 h-4 text-orange-500" /> Favorites
                   </Link>
-
+                  <Link
+                    to="/guest-wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                  >
+                    <Heart className="w-4 h-4 text-orange-500" /> Wishlist
+                  </Link>
                   <button
                     onClick={async () => {
                       await signOut(auth);
@@ -777,171 +804,171 @@ const Homes = () => {
 
       {/* 🔍 Enhanced Search Section */}
       <section className="mt-10 flex justify-center px-4 sm:px-0 relative z-[50]">
-          <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl w-full max-w-5xl px-4 sm:px-6 py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 border border-gray-200 relative">
+        <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl w-full max-w-5xl px-4 sm:px-6 py-4 flex flex-wrap sm:flex-nowrap items-center justify-between gap-4 border border-gray-200 relative">
 
-            {/* Location */}
-            <div ref={locationRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[140px] z-[60]">
-              <button
-                onClick={() => setLocationOpen(!locationOpen)}
-                className="w-full text-left border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">Where</label>
-                <span className="text-sm text-gray-700">
-                  {searchLocation 
-                    ? (searchLocation.length > 20 
-                        ? searchLocation.slice(0, 20) + "..." 
-                        : searchLocation)
-                    : "Select location ▼"}
-                </span>
-              </button>
+          {/* Location */}
+          <div ref={locationRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[140px] z-[60]">
+            <button
+              onClick={() => setLocationOpen(!locationOpen)}
+              className="w-full text-left border-none bg-transparent focus:outline-none"
+            >
+              <label className="text-sm font-semibold text-gray-700 block">Where</label>
+              <span className="text-sm text-gray-700">
+                {searchLocation
+                  ? (searchLocation.length > 20
+                    ? searchLocation.slice(0, 20) + "..."
+                    : searchLocation)
+                  : "Select location ▼"}
+              </span>
+            </button>
 
-              {locationOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-64 max-h-80 overflow-y-auto p-2 text-gray-800 top-full left-0">
-                  {/* Search input for filtering */}
-                  <input
-                    type="text"
-                    placeholder="Search locations..."
-                    value={searchLocation}
-                    onChange={(e) => setSearchLocation(e.target.value)}
-                    className="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  
-                  {/* Clear option */}
-                  <button
-                    onClick={() => {
-                      setSearchLocation("");
-                      setLocationOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Clear selection
-                  </button>
+            {locationOpen && (
+              <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-64 max-h-80 overflow-y-auto p-2 text-gray-800 top-full left-0">
+                {/* Search input for filtering */}
+                <input
+                  type="text"
+                  placeholder="Search locations..."
+                  value={searchLocation}
+                  onChange={(e) => setSearchLocation(e.target.value)}
+                  className="w-full px-3 py-2 mb-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
 
-                  {/* Divider */}
-                  <div className="border-t border-gray-200 my-2"></div>
+                {/* Clear option */}
+                <button
+                  onClick={() => {
+                    setSearchLocation("");
+                    setLocationOpen(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Clear selection
+                </button>
 
-                  {/* Location options */}
-                  {locations
-                    .filter(loc => 
-                      loc.toLowerCase().includes(searchLocation.toLowerCase())
-                    )
-                    .map((loc, index) => (
-                      <button
-                        key={index}
-                        onClick={() => {
-                          setSearchLocation(loc);
-                          setLocationOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
-                      >
-                        📍 {loc}
-                      </button>
-                    ))}
-                  
-                  {/* No results message */}
-                  {locations.filter(loc => 
+                {/* Divider */}
+                <div className="border-t border-gray-200 my-2"></div>
+
+                {/* Location options */}
+                {locations
+                  .filter(loc =>
                     loc.toLowerCase().includes(searchLocation.toLowerCase())
-                  ).length === 0 && searchLocation && (
+                  )
+                  .map((loc, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setSearchLocation(loc);
+                        setLocationOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                    >
+                      📍 {loc}
+                    </button>
+                  ))}
+
+                {/* No results message */}
+                {locations.filter(loc =>
+                  loc.toLowerCase().includes(searchLocation.toLowerCase())
+                ).length === 0 && searchLocation && (
                     <div className="px-3 py-4 text-sm text-gray-500 text-center">
                       No locations found
                     </div>
                   )}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
 
-            {/* Single Date Picker */}
-            <div ref={dateRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[200px]">
-              <button
-                onClick={() => setDateOpen(!dateOpen)}
-                className="w-full text-left border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">When</label>
-                <span className="text-sm text-gray-700">{formatDateDisplay()}</span>
-              </button>
+          {/* Single Date Picker */}
+          <div ref={dateRef} className="relative flex flex-col justify-center px-4 py-2 border-b sm:border-b-0 sm:border-r border-gray-300 flex-1 min-w-[200px]">
+            <button
+              onClick={() => setDateOpen(!dateOpen)}
+              className="w-full text-left border-none bg-transparent focus:outline-none"
+            >
+              <label className="text-sm font-semibold text-gray-700 block">When</label>
+              <span className="text-sm text-gray-700">{formatDateDisplay()}</span>
+            </button>
 
-              {dateOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-80 p-6 text-gray-800 top-full left-0">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => handleDateSelect(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full text-gray-700 text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  {selectedDate && (
-                    <div className="mt-4 flex justify-end">
+            {dateOpen && (
+              <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-80 p-6 text-gray-800 top-full left-0">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => handleDateSelect(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full text-gray-700 text-sm px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+                {selectedDate && (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={() => setSelectedDate("")}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Clear date
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Guests Dropdown */}
+          <div ref={guestRef} className="relative flex-1 min-w-[140px]">
+            <button
+              onClick={() => setGuestOpen(!guestOpen)}
+              className="w-full text-left px-4 py-2 border-none bg-transparent focus:outline-none"
+            >
+              <label className="text-sm font-semibold text-gray-700 block">Who</label>
+              <span className="text-sm text-gray-700">
+                {guests.adults + guests.children + guests.infants + guests.pets > 0
+                  ? `${guests.adults + guests.children + guests.infants + guests.pets} guest${guests.adults + guests.children + guests.infants + guests.pets !== 1 ? "s" : ""} ▼`
+                  : "Add guests ▼"}
+              </span>
+            </button>
+
+            {guestOpen && (
+              <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-56 p-4 text-gray-800 top-full left-0">
+                {["adults", "children", "infants", "pets"].map((key) => (
+                  <div key={key} className="flex justify-between items-center mb-3 last:mb-0">
+                    <span className="text-sm capitalize">{key}</span>
+                    <div className="flex items-center gap-3">
                       <button
-                        onClick={() => setSelectedDate("")}
-                        className="text-xs text-gray-500 hover:text-gray-700"
+                        onClick={() => setGuests((prev) => ({ ...prev, [key]: Math.max(0, prev[key] - 1) }))}
+                        className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
                       >
-                        Clear date
+                        -
+                      </button>
+                      <span className="w-4 text-center text-sm">{guests[key]}</span>
+                      <button
+                        onClick={() => setGuests((prev) => ({ ...prev, [key]: prev[key] + 1 }))}
+                        className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
+                      >
+                        +
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Guests Dropdown */}
-            <div ref={guestRef} className="relative flex-1 min-w-[140px]">
-              <button
-                onClick={() => setGuestOpen(!guestOpen)}
-                className="w-full text-left px-4 py-2 border-none bg-transparent focus:outline-none"
-              >
-                <label className="text-sm font-semibold text-gray-700 block">Who</label>
-                <span className="text-sm text-gray-700">
-                  {guests.adults + guests.children + guests.infants + guests.pets > 0
-                    ? `${guests.adults + guests.children + guests.infants + guests.pets} guest${guests.adults + guests.children + guests.infants + guests.pets !== 1 ? "s" : ""} ▼`
-                    : "Add guests ▼"}
-                </span>
-              </button>
-
-              {guestOpen && (
-                <div className="absolute z-[10000] mt-2 bg-white shadow-xl rounded-xl w-56 p-4 text-gray-800 top-full left-0">
-                  {["adults", "children", "infants", "pets"].map((key) => (
-                    <div key={key} className="flex justify-between items-center mb-3 last:mb-0">
-                      <span className="text-sm capitalize">{key}</span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setGuests((prev) => ({ ...prev, [key]: Math.max(0, prev[key] - 1) }))}
-                          className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
-                        >
-                          -
-                        </button>
-                        <span className="w-4 text-center text-sm">{guests[key]}</span>
-                        <button
-                          onClick={() => setGuests((prev) => ({ ...prev, [key]: prev[key] + 1 }))}
-                          className="w-6 h-6 rounded-full border border-gray-400 flex items-center justify-center hover:bg-gray-100"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
-              <button
-                onClick={handleSearch}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-md transition w-full sm:w-auto"
-              >
-                Search
-              </button>
-              {isSearching && (
-                <button
-                  onClick={handleClearSearch}
-                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-3 rounded-md transition w-full sm:w-auto"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </section>
+
+          {/* Buttons */}
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <button
+              onClick={handleSearch}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-md transition w-full sm:w-auto"
+            >
+              Search
+            </button>
+            {isSearching && (
+              <button
+                onClick={handleClearSearch}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-3 rounded-md transition w-full sm:w-auto"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* SUGGESTED FOR YOU SECTION */}
       {user && suggestedListings.length > 0 && !isSearching && (

@@ -15,7 +15,7 @@ import {
     orderBy,
 } from "firebase/firestore";
 import defaultProfile from "./images/default-profile.png";
-import { User, Calendar, Heart, LogOut, MessageCircle, Shield, FileCheck, AlertTriangle, Lock, Scale, Headphones, Mail, Clock, CheckCircle, Info, FileText, CreditCard, Globe, Eye, Award, Bell } from "lucide-react";
+import { User, Calendar, Heart, LogOut, MessageCircle, Shield, FileCheck, AlertTriangle, Lock, Scale, Headphones, Mail, Clock, CheckCircle, Info, FileText, CreditCard, Globe, Eye, Award, Bell, History, Star } from "lucide-react";
 
 const Compliance = () => {
     const location = useLocation();
@@ -510,6 +510,13 @@ const Compliance = () => {
                                                 Profile Settings
                                             </Link>
                                             <Link
+                                                to="/transaction-history"
+                                                className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <History className="w-4 h-4 text-orange-500" />
+                                                Transaction History
+                                            </Link>
+                                            <Link
                                                 to="/bookings"
                                                 className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                                             >
@@ -527,8 +534,15 @@ const Compliance = () => {
                                                 to="/favorites"
                                                 className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
                                             >
-                                                <Heart className="w-4 h-4 text-orange-500" />
+                                                <Star className="w-4 h-4 text-orange-500" />
                                                 Favorites
+                                            </Link>
+                                            <Link
+                                                to="/guest-wishlist"
+                                                className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors"
+                                            >
+                                                <Heart className="w-4 h-4 text-orange-500" />
+                                                Wishlist
                                             </Link>
                                         </div>
 
@@ -605,6 +619,13 @@ const Compliance = () => {
                                         <User className="w-4 h-4 text-orange-500" /> Profile Settings
                                     </Link>
                                     <Link
+                                        to="/transaction-history"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                                    >
+                                        <History className="w-4 h-4 text-orange-500" /> Transaction History
+                                    </Link>
+                                    <Link
                                         to="/bookings"
                                         onClick={() => setMobileMenuOpen(false)}
                                         className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
@@ -623,9 +644,15 @@ const Compliance = () => {
                                         onClick={() => setMobileMenuOpen(false)}
                                         className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
                                     >
-                                        <Heart className="w-4 h-4 text-orange-500" /> Favorites
+                                        <Star className="w-4 h-4 text-orange-500" /> Favorites
                                     </Link>
-
+                                    <Link
+                                        to="/guest-wishlist"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="flex items-center gap-2 text-gray-700 hover:text-orange-500"
+                                    >
+                                        <Heart className="w-4 h-4 text-orange-500" /> Wishlist
+                                    </Link>
                                     <button
                                         onClick={async () => {
                                             await signOut(auth);

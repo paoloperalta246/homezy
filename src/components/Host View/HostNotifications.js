@@ -830,6 +830,21 @@ const handleApprove = async (bookingId, notifId) => {
     console.log("Creating guest notification:", guestNotifData);
     await addDoc(collection(db, "guestNotifications"), guestNotifData);
 
+    // Add transaction record for guest, including guests field
+    const transactionData = {
+      userId: bookingData.userId,
+      bookingId: bookingId,
+      amount: bookingData.finalPrice,
+      listingTitle: bookingData.listingTitle,
+      checkIn: bookingData.checkIn,
+      checkOut: bookingData.checkOut,
+      guests: bookingData.guests || bookingData.total || 1,
+      createdAt: serverTimestamp(),
+      type: "booking",
+      status: "confirmed",
+    };
+    await addDoc(collection(db, "transactions"), transactionData);
+
     // Mark notification as processed
     console.log("🔒 Marking notification as processed:", notifId);
     await updateDoc(doc(db, "notifications", notifId), { 
@@ -838,7 +853,7 @@ const handleApprove = async (bookingId, notifId) => {
     });
     console.log("✅ Notification marked as processed");
     
-    console.log("✅ Booking approved, email sent, and guest notified");
+    console.log("✅ Booking approved, email sent, guest notified, and transaction recorded");
   } catch (err) {
     console.error("❌ Failed to approve booking:", err);
     throw err;
@@ -901,7 +916,7 @@ const handleApproveCancellation = async (bookingId, notifId) => {
         listingTitle: bookingData.listingTitle,
         checkIn: bookingData.checkIn?.toDate?.() ? bookingData.checkIn.toDate().toLocaleDateString() : "N/A",
         checkOut: bookingData.checkOut?.toDate?.() ? bookingData.checkOut.toDate().toLocaleDateString() : "N/A",
-        guests: bookingData.guests?.total || 1,
+        guests: bookingData.guests?.total || bookingData.guests || bookingData.total || 1,
         price: bookingData.finalPrice,
       }),
     });
