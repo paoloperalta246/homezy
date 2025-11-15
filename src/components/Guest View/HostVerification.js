@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Check, Shield, Star, Sparkles, ArrowRight, ArrowLeft, Lock, Users, TrendingUp } from "lucide-react";
 import logo from "./homezy-logo.png";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -602,21 +602,39 @@ export default function HostVerification() {
                                 }, { merge: true });
                                 console.log("✅ Step 1: Subscription saved successfully");
 
+                                // 🔵 Step 1.5: Create serviceFees document for this host (mark as paid)
+                                const now = new Date();
+                                const planDuration = (plan === 'basic') ? 1 : (plan === 'pro') ? 3 : (plan === 'premium') ? 12 : 1;
+                                const expirationDate = new Date(now);
+                                expirationDate.setMonth(expirationDate.getMonth() + planDuration);
+                                await addDoc(collection(db, "serviceFees"), {
+                                  hostId: createdUserUid,
+                                  plan: plan,
+                                  amount: priceMap[plan],
+                                  paymentDate: now,
+                                  expirationDate: expirationDate,
+                                  status: "paid",
+                                  hostEmail: formData.email,
+                                  hostName: `${formData.firstName} ${formData.lastName}`.trim(),
+                                  paymentId: details.id,
+                                });
+                                console.log("✅ Step 1.5: serviceFees document created");
+
                                 console.log("🔵 Step 2: Sending verification email...");
                                 if (emailSendInFlightRef.current) {
                                   console.log("⚠️ Email send already in-flight. Skipping duplicate send.");
                                 } else {
                                   emailSendInFlightRef.current = true;
-                                // Send verification email
-                                const emailResponse = await axios.post(getEmailEndpoint('verification'), {
-                                  email: formData.email,
-                                  fullName: `${formData.firstName} ${formData.lastName}`.trim(),
-                                });
-                                
-                                if (!emailResponse.data.success) {
-                                  throw new Error("Failed to send verification email: " + (emailResponse.data.error || "Unknown error"));
-                                }
-                                console.log("✅ Step 2: Verification email sent successfully");
+                                  // Send verification email
+                                  const emailResponse = await axios.post(getEmailEndpoint('verification'), {
+                                    email: formData.email,
+                                    fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+                                  });
+
+                                  if (!emailResponse.data.success) {
+                                    throw new Error("Failed to send verification email: " + (emailResponse.data.error || "Unknown error"));
+                                  }
+                                  console.log("✅ Step 2: Verification email sent successfully");
                                 }
 
                                 // ✅ Set message & success state
@@ -627,7 +645,7 @@ export default function HostVerification() {
 
                               } catch (error) {
                                 console.error("❌ Payment/Subscription/Error:", error);
-                                
+
                                 // Provide more specific error messages
                                 let errorMessage = "❌ Payment processed but failed to complete registration. ";
                                 if (error.message.includes("UID not found")) {
@@ -640,7 +658,7 @@ export default function HostVerification() {
                                   errorMessage += error.message + " ";
                                 }
                                 errorMessage += "Contact support for assistance.";
-                                
+
                                 alert(errorMessage);
                                 setError(errorMessage);
                               }

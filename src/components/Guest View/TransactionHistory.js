@@ -462,6 +462,11 @@ const TransactionHistory = () => {
   // Transaction history state
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState([]);
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalPages = Math.ceil(transactions.length / pageSize);
+  const paginatedTransactions = transactions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Fetch user's transaction history from 'transactions' collection
   useEffect(() => {
@@ -890,7 +895,7 @@ const TransactionHistory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {transactions.map((tx, idx) => {
+                    {paginatedTransactions.map((tx, idx) => {
                       // Icon for category
                       let catIcon = null;
                       const cat = (tx.category || tx.type || "").toLowerCase();
@@ -958,11 +963,39 @@ const TransactionHistory = () => {
                     })}
                   </tbody>
                 </table>
+                {/* Pagination controls */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      className="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold disabled:opacity-50"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i}
+                        className={`px-3 py-1 rounded-lg font-semibold ${currentPage === i + 1 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                        onClick={() => setCurrentPage(i + 1)}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                    <button
+                      className="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold disabled:opacity-50"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             {/* Mobile card view */}
             <div className="sm:hidden space-y-6">
-              {transactions.map((tx, idx) => {
+              {paginatedTransactions.map((tx, idx) => {
                 let catIcon = null;
                 const cat = (tx.category || tx.type || "").toLowerCase();
                 if (cat.includes("home")) catIcon = <svg className="inline w-5 h-5 mr-1 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M4 10v10a1 1 0 001 1h3m10-11v11a1 1 0 01-1 1h-3m-4 0h4" /></svg>;
@@ -1008,6 +1041,34 @@ const TransactionHistory = () => {
                   </div>
                 );
               })}
+              {/* Pagination controls for mobile */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-6">
+                  <button
+                    className="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold disabled:opacity-50"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      className={`px-3 py-1 rounded-lg font-semibold ${currentPage === i + 1 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    className="px-3 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold disabled:opacity-50"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

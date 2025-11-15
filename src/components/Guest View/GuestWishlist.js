@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { auth, db } from "../../firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import logo from "./homezy-logo.png";
@@ -11,6 +11,11 @@ import { User, Calendar, Heart, LogOut, MessageCircle, Bell, History, Star } fro
 const GuestWishlist = () => {
   const [user, setUser] = useState(null);
   const [wishlist, setWishlist] = useState([]);
+  const [inputValue, setInputValue] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [guestProfile, setGuestProfile] = useState(null);
+  // Modal state
+  const [modal, setModal] = useState({ open: false, message: "", type: "info" });
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownButtonRef = useRef(null);
@@ -29,8 +34,23 @@ const GuestWishlist = () => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
+        setLoading(true);
+        // Fetch guest profile from 'guests' collection
+        try {
+          const guestSnap = await (await import("firebase/firestore")).getDoc(
+            doc(db, "guests", currentUser.uid)
+          );
+          if (guestSnap.exists()) {
+            setGuestProfile(guestSnap.data());
+          } else {
+            setGuestProfile(null);
+          }
+        } catch (e) {
+          setGuestProfile(null);
+        }
+        // Fetch wishlist
         const q = query(
-          collection(db, "wishlists"),
+          collection(db, "guestWishlist"),
           where("userId", "==", currentUser.uid)
         );
         const querySnapshot = await getDocs(q);
@@ -39,22 +59,50 @@ const GuestWishlist = () => {
           ...doc.data(),
         }));
         setWishlist(items);
+        setLoading(false);
       } else {
         navigate("/login");
       }
     });
-
     return () => unsubscribe();
   }, [navigate]);
 
-  // 🧡 Remove favorite when heart clicked
-  const handleToggleFavorite = async (id) => {
-    await deleteDoc(doc(db, "wishlists", id));
-    setWishlist((prev) => prev.filter((item) => item.id !== id));
+  // Remove wishlist item
+  const handleRemoveWishlist = async (id) => {
+    try {
+      await deleteDoc(doc(db, "guestWishlist", id));
+      setWishlist((prev) => prev.filter((item) => item.id !== id));
+      setModal({ open: true, message: "Wishlist item deleted successfully!", type: "success" });
+    } catch (err) {
+      setModal({ open: true, message: "Failed to delete wishlist item.", type: "error" });
+    }
   };
 
-  // 🧡 Helper: check if item is in wishlist
-  const isFavorited = (item) => wishlist.some((fav) => fav.id === item.id);
+  // Edit wishlist item
+  const [editId, setEditId] = useState(null);
+  const [editValue, setEditValue] = useState("");
+  const handleEditWishlist = (item) => {
+    setEditId(item.id);
+    setEditValue(item.text || item.name || item.desc || "");
+  };
+  const handleEditSave = async (id) => {
+    if (!editValue.trim()) return;
+    try {
+      await updateDoc(doc(db, "guestWishlist", id), { text: editValue.trim() });
+      setWishlist((prev) => prev.map((item) => item.id === id ? { ...item, text: editValue.trim() } : item));
+      setEditId(null);
+      setEditValue("");
+      setModal({ open: true, message: "Wishlist item updated!", type: "success" });
+    } catch (err) {
+      setModal({ open: true, message: "Failed to update wishlist item.", type: "error" });
+    }
+  };
+  const handleEditCancel = () => {
+    setEditId(null);
+    setEditValue("");
+  };
+
+  // No longer needed: isFavorited
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -426,74 +474,185 @@ const GuestWishlist = () => {
         )}
       </header>
 
-      {/* ⭐ MAIN CONTENT (Bookings.js style) */}
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 md:px-6 py-10 md:py-16">
-        <div className="text-center mb-12 md:mb-16">
+      {/* ⭐ MAIN CONTENT: Wishlist Input and List */}
+      <main className="flex-grow max-w-2xl mx-auto px-4 sm:px-6 md:px-6 py-10 md:py-16">
+        <div className="text-center mb-10 md:mb-14">
           <h1 className="text-3xl sm:text-4xl font-bold text-[#0B2545] mb-4">My Wishlist</h1>
           <p className="text-gray-600 text-base sm:text-lg max-w-2xl mx-auto">
-            Set the listings you want to see in the future
+            What do you want to see in Homezy? Suggest a feature, a place, or anything!
           </p>
           <div className="w-20 sm:w-24 h-1 bg-gradient-to-r from-orange-500 to-orange-400 mx-auto mt-6 sm:mt-8 rounded-full"></div>
         </div>
 
-        {/* Empty State Message */}
-        {wishlist.length === 0 ? (
-          <div className="text-center py-12 sm:py-16">
-            <div className="mb-6">
-              <Heart className="mx-auto h-12 sm:h-16 w-12 sm:w-16 text-gray-400" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No wishlists yet</h3>
-            <p className="text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base">
-              Browse homes and experiences, then tap the heart icon to save your favorites.
-            </p>
-            <Link
-              to="/homes"
-              className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-semibold rounded-lg shadow-sm transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Start Exploring
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8 justify-center">
-            {wishlist.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl shadow-lg hover:-translate-y-1 transition-transform duration-300 text-left w-full sm:w-72 relative"
-              >
-                {/* 🧡 Heart icon at top-right */}
-                <button
-                  onClick={() => handleToggleFavorite(item.id)}
-                  className="absolute top-3 right-3 text-2xl z-[9999] pointer-events-auto"
-                  title={isFavorited(item) ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  {isFavorited(item) ? "🧡" : "🤍"}
-                </button>
-
-                {/* Image */}
-                <div className="w-full h-40 sm:h-44 rounded-t-2xl overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Info */}
-                <div className="p-4 sm:p-5">
-                  <h3 className="font-bold text-gray-800 text-base sm:text-lg mb-1">{item.name}</h3>
-                  <p className="text-sm text-gray-500 mb-3 leading-relaxed">{item.desc}</p>
-                  <div className="flex justify-between items-center">
-                    <p className="flex items-center text-yellow-400 font-semibold text-sm">
-                      ⭐ <span className="text-gray-700 ml-1">{item.rating}</span>
-                    </p>
-                    <p className="font-bold text-gray-800">{item.price}</p>
+        <form
+          className="flex flex-col sm:flex-row gap-4 items-center justify-center mb-10"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!inputValue.trim()) return;
+            setLoading(true);
+            try {
+              const newItem = {
+                userId: user.uid,
+                text: inputValue.trim(),
+                createdAt: new Date(),
+                guestName: guestProfile?.fullName || guestProfile?.firstName || user.displayName || user.email || "Guest",
+                guestEmail: user.email || "",
+                guestPhoto: guestProfile?.photoURL || user.photoURL || "",
+              };
+              const docRef = await (await import("firebase/firestore")).addDoc(collection(db, "guestWishlist"), newItem);
+              setWishlist((prev) => [
+                { ...newItem, id: docRef.id },
+                ...prev,
+              ]);
+              setInputValue("");
+              setModal({ open: true, message: "Wishlist item added!", type: "success" });
+            } catch (err) {
+              setModal({ open: true, message: "Failed to add wishlist item.", type: "error" });
+            }
+            setLoading(false);
+          }}
+        >
+                {/* Modal Message */}
+                {modal.open && (
+                  <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black bg-opacity-30">
+                    <div className={`bg-white rounded-xl shadow-lg px-8 py-6 min-w-[260px] max-w-xs text-center border-2 ${modal.type === "success" ? "border-green-400" : modal.type === "error" ? "border-red-400" : "border-orange-400"}`}>
+                      <div className="mb-3">
+                        {modal.type === "success" && (
+                          <svg className="mx-auto w-8 h-8 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        )}
+                        {modal.type === "error" && (
+                          <svg className="mx-auto w-8 h-8 text-red-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        )}
+                        {modal.type === "info" && (
+                          <svg className="mx-auto w-8 h-8 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01" /></svg>
+                        )}
+                      </div>
+                      <div className="text-base font-semibold mb-2 text-gray-800">{modal.message}</div>
+                      <button
+                        className="mt-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-400 text-white rounded-lg font-medium shadow hover:from-orange-600 hover:to-orange-500 transition"
+                        onClick={() => setModal({ ...modal, open: false })}
+                        autoFocus
+                      >
+                        OK
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
+          <input
+            type="text"
+            className="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400 text-gray-800 text-base shadow-sm"
+            placeholder="Type your wishlist..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={loading}
+            maxLength={120}
+            required
+          />
+          <button
+            type="submit"
+            className="bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 text-white font-semibold px-6 py-3 rounded-lg shadow-sm transition-all duration-300 disabled:opacity-60"
+            disabled={loading || !inputValue.trim()}
+          >
+            {loading ? "Adding..." : "Submit Wishlist"}
+          </button>
+        </form>
+
+        {/* Wishlist List */}
+        <div className="bg-white rounded-2xl shadow-md p-6">
+          <h2 className="text-lg font-bold text-[#0B2545] mb-4 flex items-center gap-3">
+            <Heart className="w-5 h-5 text-orange-400" />
+            Your Wishlist
+          </h2>
+          {/* Guest Profile Display */}
+          {guestProfile && (
+            <div className="flex items-center gap-4 mb-6">
+              <img
+                src={guestProfile.photoURL || defaultProfile}
+                alt={guestProfile.fullName || 'Guest'}
+                className="w-12 h-12 rounded-full object-cover border-2 border-orange-200 shadow"
+              />
+              <div>
+                <div className="font-semibold text-orange-900 text-base leading-tight">{guestProfile.fullName || guestProfile.firstName || guestProfile.email}</div>
+                <div className="text-xs text-gray-500">{guestProfile.email}</div>
               </div>
-            ))}
-          </div>
-        )}
-      </main><br></br><br></br>
+            </div>
+          )}
+          {wishlist.length === 0 ? (
+            <div className="text-center text-gray-400 py-8">
+              <Heart className="mx-auto h-10 w-10 mb-2" />
+              <div>No wishlist items yet.</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full table-auto border-separate border-spacing-y-3 border-spacing-x-0">
+                <thead>
+                  <tr className="bg-orange-100">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 rounded-l-lg">Wishlist Item</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wishlist.map((item) => (
+                    <tr key={item.id} className="bg-orange-50 even:bg-orange-100 rounded-lg">
+                      <td className="px-6 py-4 align-middle w-full max-w-[32rem]">
+                        {editId === item.id ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="flex-1 px-2 py-1 rounded border border-orange-300"
+                              value={editValue}
+                              onChange={e => setEditValue(e.target.value)}
+                              maxLength={120}
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleEditSave(item.id)}
+                              className="text-green-600 hover:text-green-800 text-sm font-semibold px-2 py-1 rounded transition"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleEditCancel}
+                              className="text-gray-500 hover:text-gray-700 text-sm font-semibold px-2 py-1 rounded transition"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <span
+                            className="text-gray-800 text-base break-words max-w-[70vw] sm:max-w-[32rem] truncate"
+                            style={{ wordBreak: 'break-word', overflowWrap: 'anywhere', whiteSpace: 'pre-line' }}
+                            title={item.text || item.name || item.desc || "(No text)"}
+                          >
+                            {item.text || item.name || item.desc || "(No text)"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 align-middle text-center whitespace-nowrap">
+                        {editId !== item.id && (
+                          <div className="flex justify-center gap-2">
+                            <button
+                              onClick={() => handleEditWishlist(item)}
+                              className="text-blue-500 hover:text-blue-700 text-sm font-semibold px-2 py-1 rounded transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleRemoveWishlist(item.id)}
+                              className="text-red-500 hover:text-red-700 text-sm font-semibold px-2 py-1 rounded transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </main>
 
       {/* FOOTER */}
       <footer className="bg-gray-900 text-gray-300 py-14 px-8 md:px-16">

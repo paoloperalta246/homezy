@@ -32,6 +32,8 @@ import HostNotifications from './components/Host View/HostNotifications';
 import GuestNotifications from './components/Guest View/GuestNotifications';
 import TransactionHistory from './components/Guest View/TransactionHistory';
 import GuestWishlist from './components/Guest View/GuestWishlist';
+import GuestsHosts from './components/Admin View/GuestsHosts';
+import ServiceFees from './components/Admin View/ServiceFees';
 
 function App() {
   return (
@@ -69,6 +71,8 @@ function App() {
         <Route path="/guest-notifications" element={<GuestNotifications />} />
         <Route path="/transaction-history" element={<TransactionHistory />} />
         <Route path="/guest-wishlist" element={<GuestWishlist />} />
+        <Route path="/guests-hosts" element={<GuestsHosts />} />
+        <Route path="/service-fees" element={<ServiceFees />} />
       </Routes>
     </Router>
   );

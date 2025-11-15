@@ -1001,7 +1001,7 @@ const Compliance = () => {
                     {/* Right: Sidebar */}
                     <aside className="space-y-6">
                         {/* Navigation */}
-                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 sticky top-24">
+                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
                             <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-orange-500" />
                                 On This Page

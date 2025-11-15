@@ -382,5 +382,9 @@ app.post("/send-cancellation", async (req, res) => {
 });
 
 
+// --- User Deletion API (admin only) ---
+const deleteUserRoute = require("./api/deleteUser");
+app.use("/api", deleteUserRoute);
+
 // 🖥️ Run server
 app.listen(4000, () => console.log("✅ Server running on port 4000"));

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -10,6 +11,17 @@ import {
   DollarSign, TrendingUp, AlertCircle, Banknote, Ticket,
   Bell, LogOut
 } from "lucide-react";
+
+// Helper: Format price, no trailing .00 for whole numbers
+function formatPrice(val) {
+  if (val === undefined || val === null || isNaN(val)) return '-';
+  const num = parseFloat(val);
+  if (Number.isNaN(num)) return '-';
+  return `₱${num.toLocaleString(undefined, {
+    minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
+  })}`;
+}
 
 const Earnings = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -150,9 +162,12 @@ const Earnings = () => {
       {/* Sidebar */}
       <aside className={`fixed top-0 left-0 h-screen bg-[#F9FAFB] border-r border-gray-200 flex flex-col justify-between w-[260px] z-40 transition-transform duration-300 md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-[260px]'}`}>
         <div>
-          <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10">
-            <img src={homezyLogo} alt="Homezy Logo" className="w-11 h-11 object-contain" />
-            <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
+          <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10 w-full max-w-[210px]">
+            <img src={homezyLogo} alt="Homezy Logo" className="w-11 h-11 object-contain flex-shrink-0" />
+            <div className="flex flex-col items-start min-w-0">
+              <h1 className="text-[26px] font-bold text-[#23364A] leading-tight truncate">Homezy</h1>
+              <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap'}}>Host</span>
+            </div>
           </div>
           <nav className="flex flex-col mt-4">
             {getNavItem("/host-notifications", "Notifications", Bell)}
@@ -283,7 +298,7 @@ const Earnings = () => {
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-1">Total Earnings</p>
-                      <p className="text-2xl font-bold text-gray-900">₱{totalEarnings.toLocaleString()}.00</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatPrice(totalEarnings)}</p>
                       <p className="text-xs text-gray-500 mt-1">All time</p>
                     </div>
 
@@ -294,7 +309,7 @@ const Earnings = () => {
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-1">This Month</p>
-                      <p className="text-2xl font-bold text-gray-900">₱{thisMonthEarnings.toLocaleString()}.00</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatPrice(thisMonthEarnings)}</p>
                       <p className="text-xs text-gray-500 mt-1">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
                     </div>
 
@@ -305,7 +320,7 @@ const Earnings = () => {
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 mb-1">This Year</p>
-                      <p className="text-2xl font-bold text-gray-900">₱{thisYearEarnings.toLocaleString()}.00</p>
+                      <p className="text-2xl font-bold text-gray-900">{formatPrice(thisYearEarnings)}</p>
                       <p className="text-xs text-gray-500 mt-1">{new Date().getFullYear()}</p>
                     </div>
 
@@ -331,7 +346,7 @@ const Earnings = () => {
                         <TrendingUp className="w-5 h-5 opacity-80" />
                       </div>
                       <p className="text-sm opacity-90 mb-1">Average Per Booking</p>
-                      <p className="text-2xl font-bold">₱{avgEarningsPerBooking.toLocaleString(undefined, {maximumFractionDigits: 0})}.00</p>
+                      <p className="text-2xl font-bold">{formatPrice(avgEarningsPerBooking)}</p>
                       <p className="text-xs opacity-75 mt-1">Based on {totalBookings} bookings</p>
                     </div>
 
@@ -343,7 +358,7 @@ const Earnings = () => {
                         <Calendar className="w-5 h-5 opacity-80" />
                       </div>
                       <p className="text-sm opacity-90 mb-1">Monthly Average</p>
-                      <p className="text-2xl font-bold">₱{(thisYearEarnings / (new Date().getMonth() + 1)).toLocaleString(undefined, {maximumFractionDigits: 0})}.00</p>
+                      <p className="text-2xl font-bold">{formatPrice(thisYearEarnings / (new Date().getMonth() + 1))}</p>
                       <p className="text-xs opacity-75 mt-1">Year-to-date average</p>
                     </div>
                   </div>
@@ -432,7 +447,7 @@ const Earnings = () => {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                             <div>
                               <p className="text-xs text-gray-600">Total Earnings</p>
-                              <p className="text-2xl font-bold text-green-600">₱{totalEarnings.toLocaleString()}.00</p>
+                              <p className="text-2xl font-bold text-green-600">{formatPrice(totalEarnings)}</p>
                             </div>
                             <div>
                               <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
@@ -440,7 +455,7 @@ const Earnings = () => {
                             </div>
                             <div>
                               <p className="text-xs text-gray-600">Avg. per Booking</p>
-                              <p className="text-2xl font-bold text-purple-600">₱{avgEarningsPerBooking.toLocaleString(undefined, {maximumFractionDigits: 0})}.00</p>
+                              <p className="text-2xl font-bold text-purple-600">{formatPrice(avgEarningsPerBooking)}</p>
                             </div>
                           </div>
                         </div>
@@ -519,18 +534,18 @@ const Earnings = () => {
                                       {discount > 0 ? (
                                         <>
                                           <p className="text-sm text-gray-400 line-through">
-                                            ₱{originalPrice.toLocaleString()}.00
+                                            {formatPrice(originalPrice)}
                                           </p>
                                           <p className="text-2xl font-bold text-green-600">
-                                            ₱{earnings.toLocaleString()}.00
+                                            {formatPrice(earnings)}
                                           </p>
                                           <p className="text-xs text-gray-600 mt-1 bg-orange-100 px-2 py-1 rounded">
-                                            -₱{discount.toLocaleString()}.00 discount
+                                            -{formatPrice(discount)} discount
                                           </p>
                                         </>
                                         ) : (
                                           <span className="text-lg font-bold text-green-600">
-                                          ₱{earnings.toLocaleString()}.00
+                                          {formatPrice(earnings)}
                                         </span>
                                         )}
                                     </div>

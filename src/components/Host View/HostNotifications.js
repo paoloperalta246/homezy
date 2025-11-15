@@ -304,13 +304,16 @@ const HostNotifications = () => {
             }`}
         >
           <div>
-            <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10">
+            <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10 w-full max-w-[210px]">
               <img
                 src={homezyLogo}
                 alt="Homezy Logo"
-                className="w-11 h-11 object-contain"
+                className="w-11 h-11 object-contain flex-shrink-0"
               />
-              <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
+              <div className="flex flex-col items-start min-w-0">
+                <h1 className="text-[26px] font-bold text-[#23364A] leading-tight truncate">Homezy</h1>
+                <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap'}}>Host</span>
+              </div>
             </div>
             <nav className="flex flex-col mt-4">
               {getNavItem("/host-notifications", "Notifications", Bell, unreadCount)}

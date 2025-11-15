@@ -8,6 +8,18 @@ import defaultProfile from "./images/default-profile.png"; // ✅ Add this image
 import { Home, Clipboard, User, Gift, MessageSquare, Calendar, Ticket, Users, CreditCard, XCircle, DollarSign, Bell, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 
+
+// Helper: Format price, no trailing .00 for whole numbers
+function formatPrice(val) {
+  if (val === undefined || val === null || isNaN(val)) return '-';
+  const num = parseFloat(val);
+  if (Number.isNaN(num)) return '-';
+  return `₱${num.toLocaleString(undefined, {
+    minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("today");
   const [bookings, setBookings] = useState([]);
@@ -202,18 +214,18 @@ const Dashboard = () => {
             {booking.couponUsed && booking.discount > 0 ? (
               <>
                 <p className="text-sm text-gray-400 line-through">
-                  ₱{booking.price.toLocaleString()}.00
+                  {formatPrice(booking.price)}
                 </p>
                 <p className="font-bold text-gray-800 text-2xl">
-                  ₱{(booking.finalPrice || booking.price).toLocaleString()}.00
+                  {formatPrice(booking.finalPrice || booking.price)}
                 </p>
                 <p className="text-xs text-green-600 font-medium">
-                  Guest saved ₱{booking.discount.toLocaleString()} with {booking.couponUsed.code}
+                  Guest saved {formatPrice(booking.discount)} with {booking.couponUsed.code}
                 </p>
               </>
             ) : (
               <p className="font-bold text-gray-800 text-2xl">
-                ₱{booking.price.toLocaleString()}.00
+                {formatPrice(booking.price)}
               </p>
             )}
           </div>
@@ -357,13 +369,16 @@ const Dashboard = () => {
           className={`fixed top-0 left-0 h-screen bg-[#F9FAFB] border-r border-gray-200 flex flex-col justify-between w-[80vw] max-w-[260px] z-40 transition-transform duration-300 md:w-[260px] md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-[80vw] md:translate-x-0"}`}
         >
           <div>
-            <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10">
+            <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10 w-full max-w-[210px]">
               <img
                 src={homezyLogo}
                 alt="Homezy Logo"
-                className="w-11 h-11 object-contain"
+                className="w-11 h-11 object-contain flex-shrink-0"
               />
-              <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
+              <div className="flex flex-col items-start min-w-0">
+                <h1 className="text-[26px] font-bold text-[#23364A] leading-tight truncate">Homezy</h1>
+                <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap'}}>Host</span>
+              </div>
             </div>
             <nav className="flex flex-col mt-4">
               {getNavItem("/host-notifications", "Notifications", Bell)}
@@ -493,7 +508,7 @@ const Dashboard = () => {
             </span>
             Dashboard
           </h2>
-          <p className="text-[#5E6282] text-xs xs:text-sm sm:text-base md:text-lg mb-4 xs:mb-6 sm:mb-8">Welcome back! Here's your property overview.</p>
+          <p className="text-[#5E6282] text-xs xs:text-sm sm:text-base md:text-lg mb-4 xs:mb-6 sm:mb-8">Check recent activity and performance metrics.</p>
         </div>
 
         {/* Stats Cards */}
@@ -512,9 +527,9 @@ const Dashboard = () => {
                 </div>
               </div>
               <p className="text-sm text-blue-100 mb-1">Total Revenue</p>
-              <p className="text-2xl font-bold text-white">₱{totalRevenue.toLocaleString()}.00</p>
+              <p className="text-2xl font-bold text-white">{formatPrice(totalRevenue)}</p>
               <p className="text-xs text-blue-200 mt-2">
-                ₱{thisMonthRevenue.toLocaleString()}.00 this month
+                {formatPrice(thisMonthRevenue)} this month
               </p>
             </div>
 
@@ -584,7 +599,7 @@ const Dashboard = () => {
                     </div>
                     <div>
                       <p className="text-xs text-gray-600">This Month Revenue</p>
-                      <p className="text-base sm:text-lg font-bold text-gray-800">₱{thisMonthRevenue.toLocaleString()}.00</p>
+                      <p className="text-base sm:text-lg font-bold text-gray-800">{formatPrice(thisMonthRevenue)}</p>
                     </div>
                   </div>
                   <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${parseFloat(revenueGrowth) >= 0
@@ -621,7 +636,7 @@ const Dashboard = () => {
                     <div>
                       <p className="text-xs text-gray-600">Average Booking Value</p>
                       <p className="text-base sm:text-lg font-bold text-gray-800">
-                        ₱{bookings.length > 0 ? (totalRevenue / bookings.length).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '.00' : '0.00'}
+                        {bookings.length > 0 ? formatPrice(totalRevenue / bookings.length) : '₱0'}
                       </p>
                     </div>
                   </div>
@@ -839,12 +854,12 @@ const Dashboard = () => {
                         <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                           <div>
                             <p className="font-bold text-gray-800 text-sm sm:text-base">
-                              ₱{(booking.finalPrice || booking.price || 0).toLocaleString()}.00
+                              ₱{(booking.finalPrice || booking.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                             {booking.couponUsed && (
                               <p className="text-xs text-green-600 font-medium flex items-center gap-1 mt-1">
                                 <Ticket className="w-3 h-3" />
-                                Saved ₱{(booking.discount || 0).toLocaleString()}.00
+                                Saved ₱{(booking.discount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             )}
                           </div>

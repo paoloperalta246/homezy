@@ -1,13 +1,22 @@
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, query, where, addDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../firebase"; // ✅ Import your Firebase config
 import homezyLogo from "./images/homezy-logo.png";
 import defaultProfile from "./images/default-profile.png"; // ✅ Add this image
-import { Home, Clipboard, User, Gift, MessageSquare, Calendar, Ticket, Award, TrendingUp, History, Sparkles, DollarSign, ChevronLeft, ChevronRight, Info, X, Bell, LogOut } from "lucide-react";
+import { Home, Clipboard, User, Gift, MessageSquare, Calendar, Ticket, Award, TrendingUp, History, Sparkles, DollarSign, ChevronLeft, ChevronRight, Info, X, Bell, LogOut, PhilippinePeso } from "lucide-react";
 import { getUserPoints, addPoints, getTierByPoints, getNextTier, TIERS } from '../../utils/points';
 import { Link } from "react-router-dom";
+
+// Helper: get plan duration in months
+function getPlanDuration(plan) {
+    if (plan === 'basic') return 1;
+    if (plan === 'pro') return 3;
+    if (plan === 'premium') return 12;
+    return 1;
+}
 
 const PointsRewards = () => {
     const [activeTab, setActiveTab] = useState("overview");
@@ -17,12 +26,15 @@ const PointsRewards = () => {
     const [transactions, setTransactions] = useState([]);
     const [txLoading, setTxLoading] = useState(false);
     const [host, setHost] = useState(null); // ✅ Host data
+    const [serviceFeeStatus, setServiceFeeStatus] = useState({ paid: false, paymentDate: null, expirationDate: null, loading: true, status: 'inactive', daysLeft: 0 });
+    const [serviceFeeHistory, setServiceFeeHistory] = useState([]);
     const [dropdownOpen, setDropdownOpen] = useState(false); // ✅ Added
     const dropdownRef = useRef(null); // ✅ Added
     const [mobileOpen, setMobileOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1); // ✅ Pagination
     const [itemsPerPage] = useState(5); // ✅ Show 5 transactions per page
     const [showTiersModal, setShowTiersModal] = useState(false);
+        const [showPaypalSuccess, setShowPaypalSuccess] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const [searchTerm, setSearchTerm] = useState("");
@@ -88,12 +100,84 @@ const PointsRewards = () => {
                 } catch (e) { console.warn('Points fetch failed:', e.message); }
                 // transactions
                 fetchTransactions(user.uid);
+                // service fee status
+                fetchServiceFeeStatus(user.uid);
             } else {
                 setHost(null);
             }
         });
         return () => unsubscribe();
     }, []);
+
+    // Fetch service fee payment status and history for the current plan
+    const fetchServiceFeeStatus = async (uid) => {
+        setServiceFeeStatus({ paid: false, paymentDate: null, expirationDate: null, loading: true, status: 'inactive', daysLeft: 0 });
+        setServiceFeeHistory([]);
+        if (!uid) return;
+        try {
+            // Fetch all service fee payments for this host, sorted by paymentDate desc
+            const q = query(collection(db, 'serviceFees'), where('hostId', '==', uid));
+            const snap = await getDocs(q);
+            const allFees = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (b.paymentDate?.seconds || 0) - (a.paymentDate?.seconds || 0));
+            setServiceFeeHistory(allFees);
+
+            // Find the latest payment for the current plan
+            const fee = allFees.find(f => f.plan === (host?.subscriptionPlan || ''));
+            if (fee) {
+                const paymentDate = fee.paymentDate?.toDate ? fee.paymentDate.toDate() : (fee.paymentDate instanceof Date ? fee.paymentDate : null);
+                let expirationDate = null;
+                if (paymentDate) {
+                    expirationDate = new Date(paymentDate);
+                    expirationDate.setMonth(expirationDate.getMonth() + getPlanDuration(fee.plan));
+                }
+                // Grace period: 7 days after expiration
+                let status = 'active';
+                let daysLeft = 0;
+                if (expirationDate) {
+                    const now = new Date();
+                    const diff = Math.ceil((expirationDate - now) / (1000 * 60 * 60 * 24));
+                    daysLeft = diff;
+                    if (diff < 0 && diff >= -7) status = 'grace';
+                    else if (diff < -7) status = 'expired';
+                    else if (diff <= 7) status = 'expiring';
+                    else status = 'active';
+                }
+                setServiceFeeStatus({ paid: true, paymentDate, expirationDate, loading: false, status, daysLeft });
+            } else {
+                setServiceFeeStatus({ paid: false, paymentDate: null, expirationDate: null, loading: false, status: 'inactive', daysLeft: 0 });
+            }
+        } catch (e) {
+            setServiceFeeStatus({ paid: false, paymentDate: null, expirationDate: null, loading: false, status: 'inactive', daysLeft: 0 });
+        }
+    };
+
+    // Pay service fee with points
+    const handlePayServiceFee = async () => {
+        if (!host || !host.subscriptionPlan || !host.subscriptionPrice) return;
+        if (pointsState.total < host.subscriptionPrice) return;
+        try {
+            // Deduct points
+            await addPoints(auth.currentUser.uid, -host.subscriptionPrice, 'service_fee_payment', { plan: host.subscriptionPlan });
+            // Add service fee record
+            await addDoc(collection(db, 'serviceFees'), {
+                hostId: auth.currentUser.uid,
+                plan: host.subscriptionPlan,
+                amount: host.subscriptionPrice,
+                paymentDate: serverTimestamp(),
+                status: 'paid',
+                hostEmail: host.email,
+                hostName: host.fullName || host.firstName || '',
+            });
+            // Refresh state
+            const pt = await getUserPoints(auth.currentUser.uid);
+            setPointsState(pt);
+            fetchServiceFeeStatus(auth.currentUser.uid);
+            fetchTransactions(auth.currentUser.uid);
+        } catch (e) {
+            alert('Failed to pay service fee. Please try again.');
+        }
+    };
 
     const fetchTransactions = async (userId) => {
         setTxLoading(true);
@@ -222,13 +306,16 @@ const PointsRewards = () => {
                         }`}
                 >
                     <div>
-                        <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10">
+                        <div className="flex items-center gap-2 px-6 py-6 pl-10 pt-10 w-full max-w-[210px]">
                             <img
                                 src={homezyLogo}
                                 alt="Homezy Logo"
-                                className="w-11 h-11 object-contain"
+                                className="w-11 h-11 object-contain flex-shrink-0"
                             />
-                            <h1 className="text-[30px] font-bold text-[#23364A]">Homezy</h1>
+                            <div className="flex flex-col items-start min-w-0">
+                                <h1 className="text-[26px] font-bold text-[#23364A] leading-tight truncate">Homezy</h1>
+                                <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{ letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap' }}>Host</span>
+                            </div>
                         </div>
                         <nav className="flex flex-col mt-4">
                             {getNavItem("/host-notifications", "Notifications", Bell)}
@@ -357,7 +444,7 @@ const PointsRewards = () => {
                         </span>
                         Points & Rewards
                     </h2>
-                    <p className="text-[#5E6282] text-base sm:text-lg mb-8 max-w-2xl">Earn points automatically from bookings and reviews, climb tiers, and redeem exclusive benefits.</p>
+                    <p className="text-[#5E6282] text-base sm:text-lg mb-8 max-w-2xl">Earn points automatically from bookings and reviews and redeem exclusive benefits.</p>
                 </div>
 
                 {/* Overview Card */}
@@ -431,10 +518,10 @@ const PointsRewards = () => {
                 {/* Use Points for Service Fees */}
                 <section className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm mb-10">
                     <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-                        <DollarSign className="w-5 h-5 text-orange-500" />
+                        <PhilippinePeso className="w-5 h-5 text-orange-500" />
                         Pay Service Fees with Points
                     </h3>
-                    <p className="text-sm text-gray-600 mb-6">Use your earned points to pay admin service fees on your bookings. Each point is worth ₱1.</p>
+                    <p className="text-sm text-gray-600 mb-6">Use your earned points to pay admin service fees for your subscription plan. Each point is worth ₱1.</p>
 
                     <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl p-6">
                         <div className="flex items-start gap-4 mb-4">
@@ -456,19 +543,15 @@ const PointsRewards = () => {
                             <ul className="space-y-2 text-sm text-gray-700">
                                 <li className="flex items-start gap-2">
                                     <span className="text-orange-500 font-bold mt-0.5">1.</span>
-                                    <span>When you receive a booking, admin service fees will be applied</span>
+                                    <span>Pay your subscription plan's service fee using your points balance.</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-orange-500 font-bold mt-0.5">2.</span>
-                                    <span>You can choose to pay these fees using your points balance</span>
+                                    <span>Points will be automatically deducted from your balance.</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="text-orange-500 font-bold mt-0.5">3.</span>
-                                    <span>Points will be automatically deducted from your balance</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-orange-500 font-bold mt-0.5">4.</span>
-                                    <span>You save money while the platform earns through service fees</span>
+                                    <span>Once paid, your payment will be recorded and visible to the admin.</span>
                                 </li>
                             </ul>
                         </div>
@@ -478,6 +561,229 @@ const PointsRewards = () => {
                                 <strong>Note:</strong> Points can only be used for admin service fee payments. To create discount coupons for your guests, visit the Coupons page.
                             </p>
                         </div>
+
+                        {/* Service Fee Payment Action */}
+                        <div className="mt-6">
+                            {serviceFeeStatus.loading ? (
+                                <p className="text-sm text-gray-500">Checking payment status…</p>
+                            ) : (
+                                <div className="flex flex-col gap-2">
+                                    {/* Enhanced Service Fee Status Card */}
+                                    {serviceFeeStatus.paid && (
+                                        <div className="w-full bg-gradient-to-br from-green-50 to-white border border-green-200 rounded-2xl shadow p-8 flex flex-col lg:flex-row items-center gap-12 mb-2 animate-fadeIn">
+                                            <div className="flex flex-col items-center justify-center flex-shrink-0 min-w-[180px]">
+                                                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                                                    <Award className="w-9 h-9 text-green-500" />
+                                                </div>
+                                                <span className="px-5 py-1 rounded-full bg-green-100 text-green-700 text-base font-bold tracking-wide mb-1">Active</span>
+                                            </div>
+                                            <div className="flex-1 flex flex-col gap-6 w-full">
+                                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8 w-full">
+                                                    <div className="flex items-center gap-2 justify-center md:justify-start whitespace-nowrap">
+                                                        <span className="text-4xl font-extrabold text-green-700">{serviceFeeStatus.daysLeft}</span>
+                                                        <span className="text-xl font-semibold text-gray-700">days left</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-8 flex-wrap justify-center md:justify-end w-full">
+                                                        <div className="flex items-center gap-2 text-gray-600 text-lg">
+                                                            <Calendar className="w-5 h-5 text-orange-500" />
+                                                            <span className="font-semibold">Paid on:</span>
+                                                            <span className="font-mono">{serviceFeeStatus.paymentDate?.toLocaleDateString()}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-gray-600 text-lg">
+                                                            <Calendar className="w-5 h-5 text-blue-500" />
+                                                            <span className="font-semibold">Expires on:</span>
+                                                            <span className="font-mono">{serviceFeeStatus.expirationDate?.toLocaleDateString()}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 text-gray-600 text-lg">
+                                                            <Clipboard className="w-5 h-5 text-purple-500" />
+                                                            <span className="font-semibold">Plan:</span>
+                                                            <span className="capitalize font-bold text-purple-700">{host?.subscriptionPlan}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-gray-100 rounded-full h-3 my-2">
+                                                    <div
+                                                        className="h-3 rounded-full transition-all duration-500"
+                                                        style={{
+                                                            width: `${Math.max(0, Math.min(100, ((getPlanDuration(host.subscriptionPlan) * 30 - (getPlanDuration(host.subscriptionPlan) * 30 - serviceFeeStatus.daysLeft)) / (getPlanDuration(host.subscriptionPlan) * 30)) * 100))}%`,
+                                                            background: 'linear-gradient(90deg,#22c55e,#16a34a)'
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Renew Button */}
+                                    {(!serviceFeeStatus.paid || serviceFeeStatus.status === 'expiring' || serviceFeeStatus.status === 'grace' || serviceFeeStatus.status === 'expired') && (
+                                        <div className="flex flex-col gap-4">
+                                            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center items-center">
+                                                {/* Points Button Card */}
+                                                <div className="flex-1 flex flex-col items-center min-w-[320px] sm:min-w-[340px] md:min-w-[380px] lg:min-w-[420px]">
+                                                    <div className="w-full max-w-md rounded-3xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-amber-100 p-8 shadow-lg flex flex-col items-center hover:shadow-2xl transition group">
+                                                        <button
+                                                            className={`w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold rounded-xl shadow-lg hover:from-orange-600 hover:to-amber-600 transition text-lg disabled:opacity-60 disabled:cursor-not-allowed border-2 border-orange-400 group-hover:scale-105`}
+                                                            onClick={handlePayServiceFee}
+                                                            disabled={!host || !host.subscriptionPlan || !host.subscriptionPrice || pointsState.total < host.subscriptionPrice}
+                                                        >
+                                                            <Sparkles className="w-6 h-6 text-white drop-shadow" />
+                                                            {serviceFeeStatus.paid ? 'Renew with Points' : 'Pay with Points'}
+                                                            <span className="ml-2 text-base font-bold bg-white/20 px-3 py-1 rounded-lg border border-white/30">₱{host?.subscriptionPrice ? host.subscriptionPrice : 'N/A'}</span>
+                                                        </button>
+                                                        <span className="text-xs text-gray-500 mt-2 font-semibold">Use your points balance</span>
+                                                    </div>
+                                                </div>
+                                                {/* Vertical Divider */}
+                                                <div className="hidden sm:flex flex-col items-center mx-4">
+                                                    <div className="w-1 h-16 bg-gradient-to-b from-orange-200 to-blue-200 rounded-full"></div>
+                                                    <span className="text-sm text-gray-400 font-bold mt-4 mb-4 tracking-wider">OR</span>
+                                                    <div className="w-1 h-16 bg-gradient-to-t from-orange-200 to-blue-200 rounded-full"></div>
+                                                </div>
+                                                {/* PayPal Button Card */}
+                                                <div className="flex-1 flex flex-col items-center">
+                                                    <div className="w-full max-w-md rounded-3xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100 p-8 shadow-lg flex flex-col items-center hover:shadow-2xl transition group">
+                                                        <span className="font-bold text-blue-700 text-sm mb-2 flex items-center gap-1"><img src="https://www.paypalobjects.com/webstatic/icon/pp258.png" alt="PayPal" className="w-5 h-5 inline-block" />Pay with PayPal</span>
+                                                        <PayPalScriptProvider
+                                                            options={{
+                                                                "client-id": "AWUL2gT-UI3zhd5TNRY_gz-yxK-xvBlYMqnfG2ULdCNkgwtqAN4zWX0uuDYf1tWpEl0ymrAa6z9MXGi3",
+                                                                currency: "PHP",
+                                                            }}
+                                                        >
+                                                            <PayPalButtons
+                                                                style={{
+                                                                    layout: "vertical",
+                                                                    color: "gold",
+                                                                    shape: "pill",
+                                                                    label: "pay",
+                                                                    height: 45,
+                                                                }}
+                                                                createOrder={(data, actions) => {
+                                                                    return actions.order.create({
+                                                                        purchase_units: [
+                                                                            {
+                                                                                description: `${host?.subscriptionPlan ? host.subscriptionPlan.charAt(0).toUpperCase() + host.subscriptionPlan.slice(1) : ''} Plan Service Fee`,
+                                                                                amount: {
+                                                                                    value: host?.subscriptionPrice ? host.subscriptionPrice.toFixed(2) : '0.00',
+                                                                                    currency_code: "PHP",
+                                                                                },
+                                                                            },
+                                                                        ],
+                                                                    });
+                                                                }}
+                                                                onApprove={async (data, actions) => {
+                                                                    try {
+                                                                        const details = await actions.order.capture();
+                                                                        // Add service fee record to Firestore
+                                                                        const now = new Date();
+                                                                        const planDuration = getPlanDuration(host.subscriptionPlan);
+                                                                        const expirationDate = new Date(now);
+                                                                        expirationDate.setMonth(expirationDate.getMonth() + planDuration);
+                                                                        await addDoc(collection(db, 'serviceFees'), {
+                                                                            hostId: auth.currentUser.uid,
+                                                                            plan: host.subscriptionPlan,
+                                                                            amount: host.subscriptionPrice,
+                                                                            paymentDate: now,
+                                                                            expirationDate: expirationDate,
+                                                                            status: 'paid',
+                                                                            hostEmail: host.email,
+                                                                            hostName: host.fullName || host.firstName || '',
+                                                                            paymentId: details.id,
+                                                                        });
+                                                                        // Refresh state
+                                                                        fetchServiceFeeStatus(auth.currentUser.uid);
+                                                                        fetchTransactions(auth.currentUser.uid);
+                                                                        setShowPaypalSuccess(true);
+                                                                    } catch (e) {
+                                                                        alert('❌ PayPal payment failed. Please try again.');
+                                                                    }
+                                                                }}
+                                                                onError={(err) => {
+                                                                    console.error("PayPal Error:", err);
+                                                                    alert("❌ PayPal payment failed. Please try again.");
+                                                                }}
+                                                            />
+                                                        </PayPalScriptProvider>
+                                                        <span className="text-xs text-gray-500 mt-2 font-semibold">Use your PayPal account</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Payment History */}
+                        <section className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm mt-10">
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <History className="w-5 h-5 text-orange-500" />
+                                Service Fee Payment History
+                            </h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[500px] rounded-2xl overflow-hidden border-separate border-spacing-0">
+                                    <thead>
+                                        <tr className="bg-gradient-to-r from-orange-200 via-orange-50 to-white border-b-2 border-orange-300">
+                                            <th className="px-6 py-3 text-left text-xs font-extrabold text-orange-800 uppercase tracking-wider rounded-tl-2xl">Plan</th>
+                                            <th className="px-6 py-3 text-left text-xs font-extrabold text-orange-800 uppercase tracking-wider">Amount</th>
+                                            <th className="px-6 py-3 text-left text-xs font-extrabold text-orange-800 uppercase tracking-wider">Paid On</th>
+                                            <th className="px-6 py-3 text-left text-xs font-extrabold text-orange-800 uppercase tracking-wider rounded-tr-2xl">Expires On</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {serviceFeeHistory && serviceFeeHistory.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="text-center text-gray-400 py-8 bg-orange-50 rounded-b-2xl">No service fee payments yet.</td>
+                                            </tr>
+                                        ) : serviceFeeHistory && serviceFeeHistory.map((fee, idx) => {
+                                            // Handle Firestore Timestamp, string, or Date
+                                            let paidOn = null;
+                                            let expiresOn = null;
+                                            if (fee.paymentDate) {
+                                                if (typeof fee.paymentDate.toDate === 'function') {
+                                                    paidOn = fee.paymentDate.toDate();
+                                                } else if (typeof fee.paymentDate === 'string' || typeof fee.paymentDate === 'number') {
+                                                    paidOn = new Date(fee.paymentDate);
+                                                } else if (fee.paymentDate instanceof Date) {
+                                                    paidOn = fee.paymentDate;
+                                                } else if (fee.paymentDate?.seconds) {
+                                                    paidOn = new Date(fee.paymentDate.seconds * 1000);
+                                                }
+                                            }
+                                            if (fee.expirationDate) {
+                                                if (typeof fee.expirationDate.toDate === 'function') {
+                                                    expiresOn = fee.expirationDate.toDate();
+                                                } else if (typeof fee.expirationDate === 'string' || typeof fee.expirationDate === 'number') {
+                                                    expiresOn = new Date(fee.expirationDate);
+                                                } else if (fee.expirationDate instanceof Date) {
+                                                    expiresOn = fee.expirationDate;
+                                                } else if (fee.expirationDate?.seconds) {
+                                                    expiresOn = new Date(fee.expirationDate.seconds * 1000);
+                                                }
+                                            }
+                                            // If expirationDate is missing, calculate from paymentDate + plan duration
+                                            if (!expiresOn && paidOn && fee.plan) {
+                                                expiresOn = new Date(paidOn);
+                                                const planDuration = fee.plan === 'basic' ? 1 : fee.plan === 'pro' ? 3 : fee.plan === 'premium' ? 12 : 1;
+                                                expiresOn.setMonth(expiresOn.getMonth() + planDuration);
+                                            }
+                                            return (
+                                                <tr
+                                                    key={fee.id}
+                                                    className={
+                                                        `transition-colors duration-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-orange-50'} hover:bg-orange-100/80` +
+                                                        (idx === serviceFeeHistory.length - 1 ? ' rounded-b-2xl' : '')
+                                                    }
+                                                >
+                                                    <td className="px-6 py-4 capitalize font-semibold text-gray-700">{fee.plan}</td>
+                                                    <td className="px-6 py-4 font-bold text-orange-700">₱{fee.amount}</td>
+                                                    <td className="px-6 py-4 font-mono text-gray-600">{paidOn ? paidOn.toLocaleDateString() : '-'}</td>
+                                                    <td className="px-6 py-4 font-mono text-gray-600">{expiresOn ? expiresOn.toLocaleDateString() : '-'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
                     </div>
                 </section>
 
@@ -576,8 +882,8 @@ const PointsRewards = () => {
                                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                                 disabled={currentPage === 1}
                                                 className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === 1
-                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                        : 'bg-orange-500 text-white hover:bg-orange-600'
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-orange-500 text-white hover:bg-orange-600'
                                                     }`}
                                             >
                                                 <ChevronLeft className="w-4 h-4" />
@@ -598,8 +904,8 @@ const PointsRewards = () => {
                                                                 key={pageNum}
                                                                 onClick={() => setCurrentPage(pageNum)}
                                                                 className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === pageNum
-                                                                        ? 'bg-orange-500 text-white'
-                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                                    ? 'bg-orange-500 text-white'
+                                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                                     }`}
                                                             >
                                                                 {pageNum}
@@ -619,8 +925,8 @@ const PointsRewards = () => {
                                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                                                 disabled={currentPage === totalPages}
                                                 className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition ${currentPage === totalPages
-                                                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                        : 'bg-orange-500 text-white hover:bg-orange-600'
+                                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                    : 'bg-orange-500 text-white hover:bg-orange-600'
                                                     }`}
                                             >
                                                 <span className="hidden xs:inline">Next</span>
@@ -659,13 +965,71 @@ const PointsRewards = () => {
                                 {TIERS.map((tier, index) => {
                                     const isCurrentTier = tier.id === pointsState.tier;
                                     const nextTierInfo = TIERS[index + 1];
+                                    /* ...existing code... */
+                                })}
+                            </div>
+
+                            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 rounded-b-3xl">
+                                <button
+                                    onClick={() => setShowTiersModal(false)}
+                                    className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* PayPal Success Modal */}
+                {showPaypalSuccess && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 flex flex-col items-center animate-fadeIn">
+                            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
+                                <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12l3 3 5-5" /></svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-green-700 mb-2 text-center">Payment Successful!</h2>
+                            <p className="text-gray-700 text-center mb-4">✅ PayPal payment successful!<br/>Your service fee has been paid.</p>
+                            <button
+                                onClick={() => setShowPaypalSuccess(false)}
+                                className="mt-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition w-full"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {showTiersModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+                                <h3 className="text-2xl font-bold text-[#23364A] flex items-center gap-2">
+                                    <Award className="w-6 h-6 text-orange-500" />
+                                    Membership Tiers
+                                </h3>
+                                <button
+                                    onClick={() => setShowTiersModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition"
+                                >
+                                    <X className="w-5 h-5 text-gray-600" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <p className="text-gray-600 mb-6">
+                                    Earn points from bookings and reviews to unlock higher tiers with better rewards and multipliers!
+                                </p>
+
+                                {TIERS.map((tier, index) => {
+                                    const isCurrentTier = tier.id === pointsState.tier;
+                                    const nextTierInfo = TIERS[index + 1];
 
                                     return (
                                         <div
                                             key={tier.id}
                                             className={`border-2 rounded-2xl p-5 transition-all ${isCurrentTier
-                                                    ? 'border-orange-500 bg-orange-50 shadow-lg'
-                                                    : 'border-gray-200 bg-white hover:shadow-md'
+                                                ? 'border-orange-500 bg-orange-50 shadow-lg'
+                                                : 'border-gray-200 bg-white hover:shadow-md'
                                                 }`}
                                         >
                                             <div className="flex items-start justify-between mb-3">
