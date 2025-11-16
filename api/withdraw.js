@@ -1,3 +1,4 @@
+// Trigger redeploy: minor comment change
 // PayPal Payouts API withdrawal endpoint for Vercel/Netlify serverless
 // Requires environment variables: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET
 // Uses PayPal Sandbox by default
