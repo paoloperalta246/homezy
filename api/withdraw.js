@@ -1,24 +1,29 @@
 // Vercel Serverless Function for Withdrawals
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import sgMail from '@sendgrid/mail';
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const sgMail = require('@sendgrid/mail');
+const axios = require('axios');
+
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} catch (err) {
+  serviceAccount = null;
+}
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
 const PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox';
 const PAYPAL_API_BASE = PAYPAL_MODE === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com';
 
-if (!getApps().length) {
+if (serviceAccount && !getApps().length) {
   initializeApp({ credential: cert(serviceAccount) });
 }
 
 sgMail.setApiKey(SENDGRID_API_KEY);
 
-const axios = require('axios');
-
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -74,6 +79,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, payout: payoutRes.data });
   } catch (error) {
     console.error('Withdrawal error:', error);
+    // If error.response exists, log PayPal error details
+    if (error.response && error.response.data) {
+      console.error('PayPal error:', error.response.data);
+    }
     return res.status(500).json({ error: error.message || 'Withdrawal failed' });
   }
-}
+};
