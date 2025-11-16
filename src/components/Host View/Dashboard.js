@@ -95,8 +95,14 @@ const Dashboard = () => {
     ? ((upcomingBookings.length / bookings.length) * 100).toFixed(1)
     : 0;
 
-  const totalRevenue = bookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
-  const thisMonthRevenue = thisMonthBookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+
+  // Subtract withdrawn amount from total and this month revenue
+  const withdrawn = host?.withdrawn || 0;
+  const totalRevenueRaw = bookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+  const totalRevenue = Math.max(totalRevenueRaw - withdrawn, 0);
+  const thisMonthRevenueRaw = thisMonthBookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+  // Cap thisMonthRevenue at available totalRevenue
+  const thisMonthRevenue = Math.max(Math.min(thisMonthRevenueRaw, totalRevenue), 0);
   const lastMonthRevenue = lastMonthBookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
 
   const revenueGrowth = lastMonthRevenue > 0

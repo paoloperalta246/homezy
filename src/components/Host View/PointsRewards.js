@@ -34,12 +34,31 @@ const PointsRewards = () => {
     const [currentPage, setCurrentPage] = useState(1); // ✅ Pagination
     const [itemsPerPage] = useState(5); // ✅ Show 5 transactions per page
     const [showTiersModal, setShowTiersModal] = useState(false);
-        const [showPaypalSuccess, setShowPaypalSuccess] = useState(false);
+    const [showPaypalSuccess, setShowPaypalSuccess] = useState(false);
+    const [showPendingApprovalModal, setShowPendingApprovalModal] = useState(false); // New: pending approval modal
+    const [planPrices, setPlanPrices] = useState({}); // <-- New: holds latest plan prices
     const navigate = useNavigate();
     const location = useLocation();
     const [searchTerm, setSearchTerm] = useState("");
     const [searchInput, setSearchInput] = useState("");
     const currentPath = location.pathname;
+    // Fetch latest plan prices from Firestore
+    useEffect(() => {
+        const fetchPlanPrices = async () => {
+            try {
+                const plansSnap = await getDocs(collection(db, "subscriptionPlans"));
+                const prices = {};
+                plansSnap.forEach(doc => {
+                    const d = doc.data();
+                    prices[d.id] = d.price;
+                });
+                setPlanPrices(prices);
+            } catch (e) {
+                setPlanPrices({ basic: 500, pro: 1200, premium: 4500 }); // fallback
+            }
+        };
+        fetchPlanPrices();
+    }, []);
     // Tier visuals
     const tierObj = getTierByPoints(pointsState.total);
     const nextTier = getNextTier(pointsState.total);
@@ -154,28 +173,27 @@ const PointsRewards = () => {
 
     // Pay service fee with points
     const handlePayServiceFee = async () => {
-        if (!host || !host.subscriptionPlan || !host.subscriptionPrice) return;
-        if (pointsState.total < host.subscriptionPrice) return;
+        if (!host || !host.subscriptionPlan) return;
+        const planPrice = planPrices[host.subscriptionPlan] || 0;
+        if (pointsState.total < planPrice) return;
         try {
-            // Deduct points
-            await addPoints(auth.currentUser.uid, -host.subscriptionPrice, 'service_fee_payment', { plan: host.subscriptionPlan });
-            // Add service fee record
+            // Create a pending service fee record (do NOT deduct points yet)
             await addDoc(collection(db, 'serviceFees'), {
                 hostId: auth.currentUser.uid,
                 plan: host.subscriptionPlan,
-                amount: host.subscriptionPrice,
+                amount: planPrice,
                 paymentDate: serverTimestamp(),
-                status: 'paid',
+                status: 'pending', // Awaiting admin approval
                 hostEmail: host.email,
                 hostName: host.fullName || host.firstName || '',
+                paymentMethod: 'points',
             });
-            // Refresh state
-            const pt = await getUserPoints(auth.currentUser.uid);
-            setPointsState(pt);
+            setShowPendingApprovalModal(true);
+            // Optionally refresh state (but don't deduct points yet)
             fetchServiceFeeStatus(auth.currentUser.uid);
             fetchTransactions(auth.currentUser.uid);
         } catch (e) {
-            alert('Failed to pay service fee. Please try again.');
+            alert('Failed to submit payment for approval. Please try again.');
         }
     };
 
@@ -568,8 +586,23 @@ const PointsRewards = () => {
                                 <p className="text-sm text-gray-500">Checking payment status…</p>
                             ) : (
                                 <div className="flex flex-col gap-2">
+                                    {/* Pending Service Fee Status Card */}
+                                    {serviceFeeStatus.status === 'pending' && (
+                                        <div className="w-full bg-gradient-to-br from-yellow-50 to-white border border-yellow-200 rounded-2xl shadow p-8 flex flex-col items-center gap-4 mb-2 animate-fadeIn">
+                                            <div className="flex flex-col items-center justify-center flex-shrink-0 min-w-[180px]">
+                                                <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center mb-2">
+                                                    <svg className="w-9 h-9 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12l3 3 5-5" /></svg>
+                                                </div>
+                                                <span className="px-5 py-1 rounded-full bg-yellow-100 text-yellow-700 text-base font-bold tracking-wide mb-1">Pending Approval</span>
+                                            </div>
+                                            <div className="text-center">
+                                                <h4 className="text-lg font-bold text-yellow-800 mb-2">Payment Awaiting Admin Approval</h4>
+                                                <p className="text-yellow-700 text-base">Your payment for the <span className="capitalize font-semibold">{host?.subscriptionPlan}</span> plan is pending admin review.<br/>You will be notified once it is approved or rejected.</p>
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* Enhanced Service Fee Status Card */}
-                                    {serviceFeeStatus.paid && (
+                                    {serviceFeeStatus.status === 'paid' && (
                                         <div className="w-full bg-gradient-to-br from-green-50 to-white border border-green-200 rounded-2xl shadow p-8 flex flex-col lg:flex-row items-center gap-12 mb-2 animate-fadeIn">
                                             <div className="flex flex-col items-center justify-center flex-shrink-0 min-w-[180px]">
                                                 <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
@@ -623,11 +656,11 @@ const PointsRewards = () => {
                                                         <button
                                                             className={`w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold rounded-xl shadow-lg hover:from-orange-600 hover:to-amber-600 transition text-lg disabled:opacity-60 disabled:cursor-not-allowed border-2 border-orange-400 group-hover:scale-105`}
                                                             onClick={handlePayServiceFee}
-                                                            disabled={!host || !host.subscriptionPlan || !host.subscriptionPrice || pointsState.total < host.subscriptionPrice}
+                                                            disabled={!host || !host.subscriptionPlan || !planPrices[host.subscriptionPlan] || pointsState.total < planPrices[host.subscriptionPlan]}
                                                         >
                                                             <Sparkles className="w-6 h-6 text-white drop-shadow" />
                                                             {serviceFeeStatus.paid ? 'Renew with Points' : 'Pay with Points'}
-                                                            <span className="ml-2 text-base font-bold bg-white/20 px-3 py-1 rounded-lg border border-white/30">₱{host?.subscriptionPrice ? host.subscriptionPrice : 'N/A'}</span>
+                                                            <span className="ml-2 text-base font-bold bg-white/20 px-3 py-1 rounded-lg border border-white/30">₱{planPrices[host?.subscriptionPlan] ? planPrices[host.subscriptionPlan] : 'N/A'}</span>
                                                         </button>
                                                         <span className="text-xs text-gray-500 mt-2 font-semibold">Use your points balance</span>
                                                     </div>
@@ -657,12 +690,21 @@ const PointsRewards = () => {
                                                                     height: 45,
                                                                 }}
                                                                 createOrder={(data, actions) => {
+                                                                    // Ensure planPrices[host.subscriptionPlan] is a number
+                                                                    let price = planPrices[host?.subscriptionPlan];
+                                                                    if (typeof price === 'object' && price !== null && 'price' in price) {
+                                                                        price = price.price;
+                                                                    }
+                                                                    if (typeof price !== 'number') {
+                                                                        price = Number(price);
+                                                                    }
+                                                                    if (isNaN(price) || price <= 0) price = 0;
                                                                     return actions.order.create({
                                                                         purchase_units: [
                                                                             {
                                                                                 description: `${host?.subscriptionPlan ? host.subscriptionPlan.charAt(0).toUpperCase() + host.subscriptionPlan.slice(1) : ''} Plan Service Fee`,
                                                                                 amount: {
-                                                                                    value: host?.subscriptionPrice ? host.subscriptionPrice.toFixed(2) : '0.00',
+                                                                                    value: price.toFixed(2),
                                                                                     currency_code: "PHP",
                                                                                 },
                                                                             },
@@ -672,26 +714,22 @@ const PointsRewards = () => {
                                                                 onApprove={async (data, actions) => {
                                                                     try {
                                                                         const details = await actions.order.capture();
-                                                                        // Add service fee record to Firestore
-                                                                        const now = new Date();
-                                                                        const planDuration = getPlanDuration(host.subscriptionPlan);
-                                                                        const expirationDate = new Date(now);
-                                                                        expirationDate.setMonth(expirationDate.getMonth() + planDuration);
+                                                                        // Add service fee record to Firestore as pending (do NOT set expiration or mark as paid)
                                                                         await addDoc(collection(db, 'serviceFees'), {
                                                                             hostId: auth.currentUser.uid,
                                                                             plan: host.subscriptionPlan,
-                                                                            amount: host.subscriptionPrice,
-                                                                            paymentDate: now,
-                                                                            expirationDate: expirationDate,
-                                                                            status: 'paid',
+                                                                            amount: planPrices[host.subscriptionPlan] || 0,
+                                                                            paymentDate: new Date(),
+                                                                            status: 'pending', // Awaiting admin approval
                                                                             hostEmail: host.email,
                                                                             hostName: host.fullName || host.firstName || '',
                                                                             paymentId: details.id,
+                                                                            paymentMethod: 'paypal',
                                                                         });
-                                                                        // Refresh state
+                                                                        setShowPendingApprovalModal(true);
+                                                                        // Optionally refresh state
                                                                         fetchServiceFeeStatus(auth.currentUser.uid);
                                                                         fetchTransactions(auth.currentUser.uid);
-                                                                        setShowPaypalSuccess(true);
                                                                     } catch (e) {
                                                                         alert('❌ PayPal payment failed. Please try again.');
                                                                     }
@@ -981,17 +1019,17 @@ const PointsRewards = () => {
                     </div>
                 )}
 
-                {/* PayPal Success Modal */}
-                {showPaypalSuccess && (
+                {/* Pending Approval Modal (after payment via points or PayPal) */}
+                {showPendingApprovalModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 flex flex-col items-center animate-fadeIn">
-                            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-100 mb-4">
-                                <svg className="w-12 h-12 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12l3 3 5-5" /></svg>
+                            <div className="flex items-center justify-center w-20 h-20 rounded-full bg-yellow-100 mb-4">
+                                <svg className="w-12 h-12 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12l3 3 5-5" /></svg>
                             </div>
-                            <h2 className="text-2xl font-bold text-green-700 mb-2 text-center">Payment Successful!</h2>
-                            <p className="text-gray-700 text-center mb-4">✅ PayPal payment successful!<br/>Your service fee has been paid.</p>
+                            <h2 className="text-2xl font-bold text-yellow-700 mb-2 text-center">Awaiting Admin Approval</h2>
+                            <p className="text-gray-700 text-center mb-4">Your payment is pending admin approval.<br />You will be notified once it is reviewed.</p>
                             <button
-                                onClick={() => setShowPaypalSuccess(false)}
+                                onClick={() => setShowPendingApprovalModal(false)}
                                 className="mt-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition w-full"
                             >
                                 Close

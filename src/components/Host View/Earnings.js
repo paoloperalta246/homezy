@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, query, where, updateDoc, addDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import homezyLogo from "./images/homezy-logo.png";
 import defaultProfile from "./images/default-profile.png";
@@ -31,33 +31,51 @@ const Earnings = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Withdrawal modal state
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawEmail, setWithdrawEmail] = useState("");
+  const [withdrawError, setWithdrawError] = useState("");
+  const [withdrawSuccess, setWithdrawSuccess] = useState("");
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawals, setWithdrawals] = useState([]);
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
 
   // Earnings calculations - exclude cancelled bookings
   const activeBookings = bookings.filter(b => b.status !== 'cancelled');
-  
-  const totalEarnings = activeBookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
-  const thisMonthEarnings = activeBookings
+
+
+  // Calculate withdrawn amount from host document (default 0)
+  const withdrawn = host?.withdrawn || 0;
+
+  // Calculate total earnings as sum of all completed bookings minus withdrawn
+  const totalEarningsRaw = activeBookings.reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+  const totalEarnings = Math.max(totalEarningsRaw - withdrawn, 0);
+
+  // For thisMonthEarnings and thisYearEarnings, show only if not withdrawn, so use booking sums but cap at totalEarnings
+  const now = new Date();
+  const thisMonthEarningsRaw = activeBookings
     .filter(b => {
       const bookingDate = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt);
-      const now = new Date();
       return bookingDate.getMonth() === now.getMonth() && bookingDate.getFullYear() === now.getFullYear();
     })
     .reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+  // Cap at available earnings
+  const thisMonthEarnings = Math.max(Math.min(thisMonthEarningsRaw, totalEarnings), 0);
 
-  const thisYearEarnings = activeBookings
+  const thisYearEarningsRaw = activeBookings
     .filter(b => {
       const bookingDate = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt);
-      const now = new Date();
       return bookingDate.getFullYear() === now.getFullYear();
     })
     .reduce((sum, b) => sum + (b.finalPrice || b.price || 0), 0);
+  const thisYearEarnings = Math.max(Math.min(thisYearEarningsRaw, totalEarnings), 0);
 
   const totalBookings = activeBookings.length;
 
-  // Calculate average earnings per booking
+  // Calculate average earnings per booking (based on remaining earnings)
   const avgEarningsPerBooking = totalBookings > 0 ? totalEarnings / totalBookings : 0;
 
   // Auth and data fetching
@@ -67,12 +85,18 @@ const Earnings = () => {
         try {
           const docRef = doc(db, "hosts", user.uid);
           const docSnap = await getDoc(docRef);
-
           if (docSnap.exists()) {
             setHost(docSnap.data());
+            // Fetch withdrawals subcollection
+            const withdrawalsRef = collection(docRef, "withdrawals");
+            const withdrawalsSnap = await getDocs(withdrawalsRef);
+            const withdrawalList = withdrawalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Sort by date descending
+            withdrawalList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            setWithdrawals(withdrawalList);
           }
         } catch (err) {
-          console.error("Error fetching host:", err);
+          console.error("Error fetching host or withdrawals:", err);
         }
 
         // Fetch bookings
@@ -103,6 +127,7 @@ const Earnings = () => {
         }
       } else {
         setHost(null);
+        setWithdrawals([]);
         setLoading(false);
       }
     });
@@ -134,9 +159,8 @@ const Earnings = () => {
     return (
       <button
         onClick={() => handleNavigation(path)}
-        className={`flex items-center gap-3 px-6 py-3 font-medium transition rounded-md ${
-          isActive ? "bg-[#FF5A1F] text-white" : "text-[#23364A] hover:bg-gray-100"
-        }`}
+        className={`flex items-center gap-3 px-6 py-3 font-medium transition rounded-md ${isActive ? "bg-[#FF5A1F] text-white" : "text-[#23364A] hover:bg-gray-100"
+          }`}
       >
         {Icon && <Icon className="w-5 h-5 text-current" />}
         <span className={isActive ? "text-white" : "text-[#23364A]"}>{label}</span>
@@ -166,18 +190,18 @@ const Earnings = () => {
             <img src={homezyLogo} alt="Homezy Logo" className="w-11 h-11 object-contain flex-shrink-0" />
             <div className="flex flex-col items-start min-w-0">
               <h1 className="text-[26px] font-bold text-[#23364A] leading-tight truncate">Homezy</h1>
-              <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap'}}>Host</span>
+              <span className="mt-1 px-2 py-[2px] rounded-full bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold shadow border border-white/70 align-middle tracking-wider" style={{ letterSpacing: '0.5px', maxWidth: '70px', whiteSpace: 'nowrap' }}>Host</span>
             </div>
           </div>
           <nav className="flex flex-col mt-4">
             {getNavItem("/host-notifications", "Notifications", Bell)}
-              <div className="border-t border-gray-300 my-4 mx-6"></div>
-            {getNavItem('/dashboard','Dashboard',Home)}
-            {getNavItem('/listings','My Listings',Clipboard)}
-            {getNavItem('/host-messages','Messages',MessageSquare)}
-            {getNavItem('/calendar','Calendar',Calendar)}
-            {getNavItem('/points-rewards','Points & Rewards',Gift)}
-            {getNavItem('/earnings','Earnings',DollarSign)}
+            <div className="border-t border-gray-300 my-4 mx-6"></div>
+            {getNavItem('/dashboard', 'Dashboard', Home)}
+            {getNavItem('/listings', 'My Listings', Clipboard)}
+            {getNavItem('/host-messages', 'Messages', MessageSquare)}
+            {getNavItem('/calendar', 'Calendar', Calendar)}
+            {getNavItem('/points-rewards', 'Points & Rewards', Gift)}
+            {getNavItem('/earnings', 'Earnings', DollarSign)}
           </nav>
         </div>
         {/* Profile + Logout (simplified) */}
@@ -217,15 +241,15 @@ const Earnings = () => {
                   <Calendar className="w-4 h-4 text-orange-500" /> Bookings
                 </button>
                 <button
-                    onClick={() => {
-                      setDropdownOpen(false);
-                      navigate("/coupons");
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors w-full text-left"
-                  >
-                    <Ticket className="w-4 h-4 text-orange-500" />
-                    Coupons
-                  </button>
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    navigate("/coupons");
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 transition-colors w-full text-left"
+                >
+                  <Ticket className="w-4 h-4 text-orange-500" />
+                  Coupons
+                </button>
               </div>
             </div>
           )}
@@ -252,23 +276,21 @@ const Earnings = () => {
         {/* Tab Switcher */}
         <div className="mb-8">
           <div className="inline-flex bg-gray-100 rounded-lg p-1 gap-1">
-            <button 
-              onClick={() => setActiveTab('overview')} 
-              className={`px-6 py-2.5 rounded-md font-semibold transition-all ${
-                activeTab === 'overview' 
-                  ? 'bg-white text-[#FF5A1F] shadow-md' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-6 py-2.5 rounded-md font-semibold transition-all ${activeTab === 'overview'
+                ? 'bg-white text-[#FF5A1F] shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               Overview
             </button>
-            <button 
-              onClick={() => setActiveTab('history')} 
-              className={`px-6 py-2.5 rounded-md font-semibold transition-all ${
-                activeTab === 'history' 
-                  ? 'bg-white text-[#FF5A1F] shadow-md' 
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-2.5 rounded-md font-semibold transition-all ${activeTab === 'history'
+                ? 'bg-white text-[#FF5A1F] shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               Earnings History
             </button>
@@ -277,290 +299,456 @@ const Earnings = () => {
         <div className="min-h-[300px]">
           {/* Existing content area retained below */}
           <div className="flex-1 overflow-y-auto p-0">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-                <p className="text-gray-500">Loading earnings data...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Overview Tab */}
-              {activeTab === "overview" && (
-                <div className="space-y-8">
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-                    <div className="bg-white border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-green-100 p-3 rounded-lg">
-                          <DollarSign className="w-6 h-6 text-green-600" />
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">Total Earnings</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatPrice(totalEarnings)}</p>
-                      <p className="text-xs text-gray-500 mt-1">All time</p>
-                    </div>
-
-                    <div className="bg-white border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-blue-100 p-3 rounded-lg">
-                          <Calendar className="w-6 h-6 text-blue-600" />
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">This Month</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatPrice(thisMonthEarnings)}</p>
-                      <p className="text-xs text-gray-500 mt-1">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
-                    </div>
-
-                    <div className="bg-white border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-purple-100 p-3 rounded-lg">
-                          <TrendingUp className="w-6 h-6 text-purple-600" />
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">This Year</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatPrice(thisYearEarnings)}</p>
-                      <p className="text-xs text-gray-500 mt-1">{new Date().getFullYear()}</p>
-                    </div>
-
-                    <div className="bg-white border-2 border-orange-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-orange-100 p-3 rounded-lg">
-                          <Clipboard className="w-6 h-6 text-orange-600" />
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
-                      <p className="text-2xl font-bold text-gray-900">{totalBookings}</p>
-                      <p className="text-xs text-gray-500 mt-1">Completed</p>
-                    </div>
-                  </div>
-
-                  {/* Additional Metrics */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-white/20 p-3 rounded-lg">
-                          <DollarSign className="w-6 h-6" />
-                        </div>
-                        <TrendingUp className="w-5 h-5 opacity-80" />
-                      </div>
-                      <p className="text-sm opacity-90 mb-1">Average Per Booking</p>
-                      <p className="text-2xl font-bold">{formatPrice(avgEarningsPerBooking)}</p>
-                      <p className="text-xs opacity-75 mt-1">Based on {totalBookings} bookings</p>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="bg-white/20 p-3 rounded-lg">
-                          <Banknote className="w-6 h-6" />
-                        </div>
-                        <Calendar className="w-5 h-5 opacity-80" />
-                      </div>
-                      <p className="text-sm opacity-90 mb-1">Monthly Average</p>
-                      <p className="text-2xl font-bold">{formatPrice(thisYearEarnings / (new Date().getMonth() + 1))}</p>
-                      <p className="text-xs opacity-75 mt-1">Year-to-date average</p>
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                      <div className="w-1 h-5 bg-orange-500 rounded"></div>
-                      Quick Actions
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <button
-                        onClick={() => setActiveTab("history")}
-                        className="flex items-center gap-4 p-4 border-2 border-blue-200 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all group"
-                      >
-                        <div className="bg-blue-100 p-3 rounded-lg group-hover:bg-blue-200 transition">
-                          <Banknote className="w-6 h-6 text-blue-600" />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-semibold text-gray-800">View History</p>
-                          <p className="text-xs text-gray-600">All earnings</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => navigate("/dashboard")}
-                        className="flex items-center gap-4 p-4 border-2 border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-400 transition-all group"
-                      >
-                        <div className="bg-purple-100 p-3 rounded-lg group-hover:bg-purple-200 transition">
-                          <Home className="w-6 h-6 text-purple-600" />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-semibold text-gray-800">Dashboard</p>
-                          <p className="text-xs text-gray-600">View bookings</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => navigate("/host-bookings")}
-                        className="flex items-center gap-4 p-4 border-2 border-green-200 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all group"
-                      >
-                        <div className="bg-green-100 p-3 rounded-lg group-hover:bg-green-200 transition">
-                          <Clipboard className="w-6 h-6 text-green-600" />
-                        </div>
-                        <div className="text-left">
-                          <p className="font-semibold text-gray-800">Bookings</p>
-                          <p className="text-xs text-gray-600">Manage bookings</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Earnings Information */}
-                  <div className="bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-blue-900">About Your Earnings</p>
-                        <p className="text-sm text-blue-800 mt-1">
-                          Your earnings are calculated from completed bookings. Earnings from active bookings are shown here and updated in real-time. Check the Earnings History tab to see detailed transaction records.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading earnings data...</p>
                 </div>
-              )}
-              {/* Earnings History Tab */}
-              {activeTab === "history" && (
-                <div className="space-y-6">
-                  <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                      <div className="w-1 h-5 bg-orange-500 rounded"></div>
-                      Earnings History
-                    </h3>
-                    
-                    {activeBookings.length === 0 ? (
-                      <div className="text-center py-16">
-                        <div className="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Banknote className="w-10 h-10 text-gray-400" />
-                        </div>
-                        <p className="text-gray-600 font-medium text-lg">No earnings yet</p>
-                        <p className="text-sm text-gray-500 mt-2">Your earnings from bookings will appear here</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Summary Stats */}
-                        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-5 mb-6 border border-green-200">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                            <div>
-                              <p className="text-xs text-gray-600">Total Earnings</p>
-                              <p className="text-2xl font-bold text-green-600">{formatPrice(totalEarnings)}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
-                              <p className="text-2xl font-bold text-blue-600">{totalBookings}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-600">Avg. per Booking</p>
-                              <p className="text-2xl font-bold text-purple-600">{formatPrice(avgEarningsPerBooking)}</p>
-                            </div>
+              </div>
+            ) : (
+              <>
+                {/* Overview Tab */}
+                {activeTab === "overview" && (
+                  <div className="space-y-8">
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                      <div className="bg-white border-2 border-green-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-green-100 p-3 rounded-lg">
+                            <DollarSign className="w-6 h-6 text-green-600" />
                           </div>
                         </div>
-
-                        {/* Earnings List */}
-                        <div className="space-y-3">
-                          {activeBookings
-                            .sort((a, b) => {
-                              const dateA = new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt);
-                              const dateB = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt);
-                              return dateB - dateA;
-                            })
-                            .map((booking) => {
-                              const earnings = booking.finalPrice || booking.price || 0;
-                              const discount = booking.discount || 0;
-                              const originalPrice = booking.price || 0;
-                              const bookingDate = new Date(
-                                booking.createdAt?.seconds 
-                                  ? booking.createdAt.seconds * 1000 
-                                  : booking.createdAt
-                              );
-                              const checkInDate = new Date(
-                                booking.checkIn?.seconds 
-                                  ? booking.checkIn.seconds * 1000 
-                                  : booking.checkIn
-                              );
-                              
-                              return (
-                                <div
-                                  key={booking.id}
-                                  className="p-5 bg-gradient-to-r from-green-50 to-white rounded-xl border-2 border-green-200 hover:shadow-md transition-all"
+                        <p className="text-sm text-gray-600 mb-1">Total Earnings</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatPrice(totalEarnings)}</p>
+                        <p className="text-xs text-gray-500 mt-1">All time</p>
+                        <button
+                          className="mt-4 px-4 py-2 bg-orange-500 text-white rounded-md font-semibold shadow hover:bg-orange-600 transition absolute right-6 bottom-6"
+                          onClick={() => {
+                            setWithdrawModal(true);
+                            setWithdrawAmount("");
+                            setWithdrawEmail("");
+                            setWithdrawError("");
+                            setWithdrawSuccess("");
+                          }}
+                        >
+                          Withdraw
+                        </button>
+                        {/* Withdraw Modal */}
+                        {withdrawModal && (
+                          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                              <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                                <h3 className="text-lg sm:text-xl font-semibold text-[#23364A] flex items-center gap-2">
+                                  <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 mr-1" />
+                                  Withdraw Earnings
+                                </h3>
+                                <button
+                                  className="p-2 rounded-full hover:bg-gray-100 transition"
+                                  onClick={() => setWithdrawModal(false)}
+                                  aria-label="Close"
                                 >
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                        <h3 className="font-bold text-gray-900 text-lg">{booking.listingTitle}</h3>
-                                        {booking.couponUsed && (
-                                          <span className="px-2.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">
-                                            COUPON APPLIED
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700 mb-3">
-                                        <p className="flex items-center gap-2">
-                                          <span className="font-semibold text-gray-800">📅 Booked:</span>
-                                          {bookingDate.toLocaleDateString("en-US", {
-                                            month: "short",
-                                            day: "numeric",
-                                            year: "numeric"
-                                          })}
-                                        </p>
-                                        <p className="flex items-center gap-2">
-                                          <span className="font-semibold text-gray-800">🏠 Check-in:</span>
-                                          {checkInDate.toLocaleDateString("en-US", {
-                                            month: "short",
-                                            day: "numeric",
-                                            year: "numeric"
-                                          })}
-                                        </p>
-                                        <p className="flex items-center gap-2">
-                                          <span className="font-semibold text-gray-800">👥 Guests:</span>
-                                          {(booking.guests?.adults || 0) +
-                                            (booking.guests?.children || 0) +
-                                            (booking.guests?.infants || 0) +
-                                            (booking.guests?.pets || 0)}
-                                        </p>
-                                        <p className="flex items-center gap-2">
-                                          <span className="font-semibold text-gray-800">📋 Status:</span>
-                                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded">
-                                            {booking.status || 'Completed'}
-                                          </span>
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <div className="text-right flex-shrink-0">
-                                      {discount > 0 ? (
-                                        <>
-                                          <p className="text-sm text-gray-400 line-through">
-                                            {formatPrice(originalPrice)}
-                                          </p>
-                                          <p className="text-2xl font-bold text-green-600">
-                                            {formatPrice(earnings)}
-                                          </p>
-                                          <p className="text-xs text-gray-600 mt-1 bg-orange-100 px-2 py-1 rounded">
-                                            -{formatPrice(discount)} discount
-                                          </p>
-                                        </>
-                                        ) : (
-                                          <span className="text-lg font-bold text-green-600">
-                                          {formatPrice(earnings)}
-                                        </span>
-                                        )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              </div>
+                              <form
+                                className="px-4 sm:px-6 pt-4 pb-6 flex flex-col gap-4"
+                                onSubmit={e => {
+                                  e.preventDefault();
+                                  setWithdrawError("");
+                                  setWithdrawSuccess("");
+                                  // Basic validation
+                                  const amount = parseFloat(withdrawAmount);
+                                  if (!withdrawAmount || isNaN(amount) || amount <= 0) {
+                                    setWithdrawError("Enter a valid amount.");
+                                    return;
+                                  }
+                                  if (amount > totalEarnings) {
+                                    setWithdrawError("Amount exceeds total earnings.");
+                                    return;
+                                  }
+                                  if (!withdrawEmail || !withdrawEmail.includes("@")) {
+                                    setWithdrawError("Enter a valid PayPal sandbox email.");
+                                    return;
+                                  }
+                                  // Real withdrawal: call backend
+                                  setWithdrawLoading(true);
+                                  fetch("http://localhost:4000/api/withdraw", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      amount: amount,
+                                      email: withdrawEmail,
+                                      hostUid: host?.uid || host?.id || null
+                                    })
+                                  })
+                                    .then(async (res) => {
+                                      const data = await res.json();
+                                      if (!res.ok) throw new Error(data.error || "Withdrawal failed");
+                                      // After successful withdrawal, refetch host and withdrawals to update UI
+                                      try {
+                                        const hostId = host?.uid || host?.id;
+                                        if (hostId) {
+                                          const hostRef = doc(db, "hosts", hostId);
+                                          const hostSnap = await getDoc(hostRef);
+                                          if (hostSnap.exists()) {
+                                            setHost(hostSnap.data());
+                                            // Refetch withdrawals
+                                            const withdrawalsRef = collection(hostRef, "withdrawals");
+                                            const withdrawalsSnap = await getDocs(withdrawalsRef);
+                                            const withdrawalList = withdrawalsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                            withdrawalList.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                                            setWithdrawals(withdrawalList);
+                                          }
+                                        }
+                                      } catch (err) {
+                                        console.error("Error refetching host/withdrawals after withdrawal:", err);
+                                      }
+                                      setWithdrawSuccess(`Withdrawal of ₱${amount.toLocaleString()} to ${withdrawEmail} successful!`);
+                                      setWithdrawAmount("");
+                                      setWithdrawEmail("");
+                                    })
+                                    .catch((err) => {
+                                      setWithdrawError(err.message || "Withdrawal failed");
+                                    })
+                                    .finally(() => setWithdrawLoading(false));
+                                }}
+                              >
+                                <label className="block">
+                                  <span className="text-sm font-medium text-gray-700">Amount to Withdraw</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    step="0.01"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
+                                    placeholder="Enter amount (₱)"
+                                    value={withdrawAmount}
+                                    onChange={e => setWithdrawAmount(e.target.value)}
+                                    disabled={withdrawLoading}
+                                    required
+                                  />
+                                </label>
+                                <label className="block">
+                                  <span className="text-sm font-medium text-gray-700">PayPal Sandbox Email</span>
+                                  <input
+                                    type="email"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-orange-500 focus:border-orange-500"
+                                    placeholder="your-sandbox@email.com"
+                                    value={withdrawEmail}
+                                    onChange={e => setWithdrawEmail(e.target.value)}
+                                    disabled={withdrawLoading}
+                                    required
+                                  />
+                                </label>
+                                {withdrawError && <div className="text-red-600 text-sm font-medium">{withdrawError}</div>}
+                                {withdrawSuccess && <div className="text-green-600 text-sm font-medium">{withdrawSuccess}</div>}
+                                <button
+                                  type="submit"
+                                  className="mt-2 px-4 py-2 bg-orange-500 text-white rounded-md font-semibold shadow hover:bg-orange-600 transition disabled:opacity-60"
+                                  disabled={withdrawLoading}
+                                >
+                                  {withdrawLoading ? "Processing..." : "Withdraw"}
+                                </button>
+                              </form>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-white border-2 border-blue-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-blue-100 p-3 rounded-lg">
+                            <Calendar className="w-6 h-6 text-blue-600" />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">This Month</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatPrice(thisMonthEarnings)}</p>
+                        <p className="text-xs text-gray-500 mt-1">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
+                      </div>
+
+                      <div className="bg-white border-2 border-purple-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-purple-100 p-3 rounded-lg">
+                            <TrendingUp className="w-6 h-6 text-purple-600" />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">This Year</p>
+                        <p className="text-2xl font-bold text-gray-900">{formatPrice(thisYearEarnings)}</p>
+                        <p className="text-xs text-gray-500 mt-1">{new Date().getFullYear()}</p>
+                      </div>
+
+                      <div className="bg-white border-2 border-orange-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-orange-100 p-3 rounded-lg">
+                            <Clipboard className="w-6 h-6 text-orange-600" />
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
+                        <p className="text-2xl font-bold text-gray-900">{totalBookings}</p>
+                        <p className="text-xs text-gray-500 mt-1">Completed</p>
+                      </div>
+                    </div>
+
+                    {/* Additional Metrics */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-white/20 p-3 rounded-lg">
+                            <DollarSign className="w-6 h-6" />
+                          </div>
+                          <TrendingUp className="w-5 h-5 opacity-80" />
+                        </div>
+                        <p className="text-sm opacity-90 mb-1">Average Per Booking</p>
+                        <p className="text-2xl font-bold">{formatPrice(avgEarningsPerBooking)}</p>
+                        <p className="text-xs opacity-75 mt-1">Based on {totalBookings} bookings</p>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="bg-white/20 p-3 rounded-lg">
+                            <Banknote className="w-6 h-6" />
+                          </div>
+                          <Calendar className="w-5 h-5 opacity-80" />
+                        </div>
+                        <p className="text-sm opacity-90 mb-1">Monthly Average</p>
+                        <p className="text-2xl font-bold">{formatPrice(thisYearEarnings / (new Date().getMonth() + 1))}</p>
+                        <p className="text-xs opacity-75 mt-1">Year-to-date average</p>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <div className="w-1 h-5 bg-orange-500 rounded"></div>
+                        Quick Actions
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button
+                          onClick={() => setActiveTab("history")}
+                          className="flex items-center gap-4 p-4 border-2 border-blue-200 rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all group"
+                        >
+                          <div className="bg-blue-100 p-3 rounded-lg group-hover:bg-blue-200 transition">
+                            <Banknote className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-gray-800">View History</p>
+                            <p className="text-xs text-gray-600">All earnings</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => navigate("/dashboard")}
+                          className="flex items-center gap-4 p-4 border-2 border-purple-200 rounded-lg hover:bg-purple-50 hover:border-purple-400 transition-all group"
+                        >
+                          <div className="bg-purple-100 p-3 rounded-lg group-hover:bg-purple-200 transition">
+                            <Home className="w-6 h-6 text-purple-600" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-gray-800">Dashboard</p>
+                            <p className="text-xs text-gray-600">View bookings</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => navigate("/host-bookings")}
+                          className="flex items-center gap-4 p-4 border-2 border-green-200 rounded-lg hover:bg-green-50 hover:border-green-400 transition-all group"
+                        >
+                          <div className="bg-green-100 p-3 rounded-lg group-hover:bg-green-200 transition">
+                            <Clipboard className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-gray-800">Bookings</p>
+                            <p className="text-xs text-gray-600">Manage bookings</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Earnings Information */}
+                    <div className="bg-blue-50 border-l-4 border-blue-400 p-5 rounded-r-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-blue-900">About Your Earnings</p>
+                          <p className="text-sm text-blue-800 mt-1">
+                            Your earnings are calculated from completed bookings. Earnings from active bookings are shown here and updated in real-time. Check the Earnings History tab to see detailed transaction records.
+                          </p>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
-          )}
+                )}
+                {/* Earnings History Tab */}
+                {activeTab === "history" && (
+                  <div className="space-y-6">
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                      <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <div className="w-1 h-5 bg-orange-500 rounded"></div>
+                        Earnings History
+                      </h3>
+                      {/* Withdrawals History */}
+                      <div className="mb-8">
+                        <h4 className="text-md font-bold text-gray-700 mb-2 flex items-center gap-2">
+                          <Banknote className="w-5 h-5 text-green-600" /> Withdrawal History
+                        </h4>
+                        {withdrawals.length === 0 ? (
+                          <div className="text-gray-500 text-sm mb-4">No withdrawals yet.</div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="min-w-[320px] w-full text-sm border rounded-lg">
+                              <thead>
+                                <tr className="bg-green-50">
+                                  <th className="px-4 py-2 text-left font-semibold text-green-700">Date</th>
+                                  <th className="px-4 py-2 text-left font-semibold text-green-700">Amount</th>
+                                  <th className="px-4 py-2 text-left font-semibold text-green-700">Email</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {withdrawals.map(w => (
+                                  <tr key={w.id} className="border-b last:border-b-0">
+                                    <td className="px-4 py-2">
+                                      {w.createdAt?.seconds
+                                        ? new Date(w.createdAt.seconds * 1000).toLocaleString()
+                                        : w.createdAt
+                                          ? new Date(w.createdAt).toLocaleString()
+                                          : ''}
+                                    </td>
+                                    <td className="px-4 py-2 font-bold text-green-700">{formatPrice(w.amount)}</td>
+                                    <td className="px-4 py-2">{w.email}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                      {/* Earnings List and Stats */}
+                      {activeBookings.length === 0 ? (
+                        <div className="text-center py-16">
+                          <div className="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Banknote className="w-10 h-10 text-gray-400" />
+                          </div>
+                          <p className="text-gray-600 font-medium text-lg">No earnings yet</p>
+                          <p className="text-sm text-gray-500 mt-2">Your earnings from bookings will appear here</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Summary Stats */}
+                          <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-5 mb-6 border border-green-200">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                              <div>
+                                <p className="text-xs text-gray-600">Total Earnings</p>
+                                <p className="text-2xl font-bold text-green-600">{formatPrice(totalEarnings)}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
+                                <p className="text-2xl font-bold text-blue-600">{totalBookings}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-600">Avg. per Booking</p>
+                                <p className="text-2xl font-bold text-purple-600">{formatPrice(avgEarningsPerBooking)}</p>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Earnings List */}
+                          <div className="space-y-3">
+                            {activeBookings
+                              .sort((a, b) => {
+                                const dateA = new Date(a.createdAt?.seconds ? a.createdAt.seconds * 1000 : a.createdAt);
+                                const dateB = new Date(b.createdAt?.seconds ? b.createdAt.seconds * 1000 : b.createdAt);
+                                return dateB - dateA;
+                              })
+                              .map((booking) => {
+                                const earnings = booking.finalPrice || booking.price || 0;
+                                const discount = booking.discount || 0;
+                                const originalPrice = booking.price || 0;
+                                const bookingDate = new Date(
+                                  booking.createdAt?.seconds
+                                    ? booking.createdAt.seconds * 1000
+                                    : booking.createdAt
+                                );
+                                const checkInDate = new Date(
+                                  booking.checkIn?.seconds
+                                    ? booking.checkIn.seconds * 1000
+                                    : booking.checkIn
+                                );
+
+                                return (
+                                  <div
+                                    key={booking.id}
+                                    className="p-5 bg-gradient-to-r from-green-50 to-white rounded-xl border-2 border-green-200 hover:shadow-md transition-all"
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                          <h3 className="font-bold text-gray-900 text-lg">{booking.listingTitle}</h3>
+                                          {booking.couponUsed && (
+                                            <span className="px-2.5 py-0.5 bg-orange-500 text-white text-xs font-bold rounded-full">
+                                              COUPON APPLIED
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700 mb-3">
+                                          <p className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-800">📅 Booked:</span>
+                                            {bookingDate.toLocaleDateString("en-US", {
+                                              month: "short",
+                                              day: "numeric",
+                                              year: "numeric"
+                                            })}
+                                          </p>
+                                          <p className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-800">🏠 Check-in:</span>
+                                            {checkInDate.toLocaleDateString("en-US", {
+                                              month: "short",
+                                              day: "numeric",
+                                              year: "numeric"
+                                            })}
+                                          </p>
+                                          <p className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-800">👥 Guests:</span>
+                                            {(booking.guests?.adults || 0) +
+                                              (booking.guests?.children || 0) +
+                                              (booking.guests?.infants || 0) +
+                                              (booking.guests?.pets || 0)}
+                                          </p>
+                                          <p className="flex items-center gap-2">
+                                            <span className="font-semibold text-gray-800">📋 Status:</span>
+                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded">
+                                              {booking.status || 'Completed'}
+                                            </span>
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right flex-shrink-0">
+                                        {discount > 0 ? (
+                                          <>
+                                            <p className="text-sm text-gray-400 line-through">
+                                              {formatPrice(originalPrice)}
+                                            </p>
+                                            <p className="text-2xl font-bold text-green-600">
+                                              {formatPrice(earnings)}
+                                            </p>
+                                            <p className="text-xs text-gray-600 mt-1 bg-orange-100 px-2 py-1 rounded">
+                                              -{formatPrice(discount)} discount
+                                            </p>
+                                          </>
+                                        ) : (
+                                          <span className="text-lg font-bold text-green-600">
+                                            {formatPrice(earnings)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </main>

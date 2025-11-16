@@ -890,28 +890,35 @@ const GuestNotifications = () => {
                       {newNotifs.map((notif, index) => (
                         <div
                           key={notif.id}
-                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${notif.type === 'booking_approved'
-                              ? 'border-green-200 hover:border-green-400'
-                              : 'border-red-200 hover:border-red-400'
-                            }`}
+                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden
+                            ${notif.type === 'booking_approved' ? 'border-green-200 hover:border-green-400'
+                              : notif.type === 'wishlist_read' ? 'border-blue-200 hover:border-blue-400'
+                              : 'border-red-200 hover:border-red-400'}
+                          `}
                           style={{ animationDelay: `${index * 50}ms` }}
                         >
                           {/* Gradient accent bar */}
-                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${notif.type === 'booking_approved'
-                              ? 'from-green-400 to-green-600'
-                              : 'from-red-400 to-red-600'
-                            }`}></div>
+                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b
+                            ${notif.type === 'booking_approved' ? 'from-green-400 to-green-600'
+                              : notif.type === 'wishlist_read' ? 'from-blue-400 to-blue-600'
+                              : 'from-red-400 to-red-600'}
+                          `}></div>
 
                           <div className="p-6 pl-8">
                             <div className="flex items-start justify-between gap-4">
                               {/* Icon and Content */}
                               <div className="flex items-start gap-4 flex-1">
-                                <div className={`p-3 rounded-xl flex-shrink-0 ${notif.type === 'booking_approved'
-                                    ? 'bg-gradient-to-br from-green-100 to-green-200'
-                                    : 'bg-gradient-to-br from-red-100 to-red-200'
-                                  }`}>
+                                <div className={`p-3 rounded-xl flex-shrink-0
+                                  ${notif.type === 'booking_approved' ? 'bg-gradient-to-br from-green-100 to-green-200'
+                                    : notif.type === 'wishlist_read' ? 'bg-gradient-to-br from-blue-100 to-blue-200'
+                                    : 'bg-gradient-to-br from-red-100 to-red-200'}
+                                `}>
                                   {notif.type === 'booking_approved' ? (
                                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : notif.type === 'wishlist_read' ? (
+                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                   ) : (
@@ -972,28 +979,35 @@ const GuestNotifications = () => {
                       {oldNotifs.map((notif, index) => (
                         <div
                           key={notif.id}
-                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden ${notif.type === 'booking_approved'
-                              ? 'border-green-200 hover:border-green-400'
-                              : 'border-red-200 hover:border-red-400'
-                            }`}
+                          className={`group relative bg-gradient-to-br from-white to-gray-50 border-2 rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 overflow-hidden
+                            ${notif.type === 'booking_approved' ? 'border-green-200 hover:border-green-400'
+                              : notif.type === 'wishlist_read' ? 'border-blue-200 hover:border-blue-400'
+                              : 'border-red-200 hover:border-red-400'}
+                          `}
                           style={{ animationDelay: `${index * 50}ms` }}
                         >
                           {/* Gradient accent bar */}
-                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b ${notif.type === 'booking_approved'
-                              ? 'from-green-400 to-green-600'
-                              : 'from-red-400 to-red-600'
-                            }`}></div>
+                          <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-b
+                            ${notif.type === 'booking_approved' ? 'from-green-400 to-green-600'
+                              : notif.type === 'wishlist_read' ? 'from-blue-400 to-blue-600'
+                              : 'from-red-400 to-red-600'}
+                          `}></div>
 
                           <div className="p-6 pl-8">
                             <div className="flex items-start justify-between gap-4">
                               {/* Icon and Content */}
                               <div className="flex items-start gap-4 flex-1">
-                                <div className={`p-3 rounded-xl flex-shrink-0 ${notif.type === 'booking_approved'
-                                    ? 'bg-gradient-to-br from-green-100 to-green-200'
-                                    : 'bg-gradient-to-br from-red-100 to-red-200'
-                                  }`}>
+                                <div className={`p-3 rounded-xl flex-shrink-0
+                                  ${notif.type === 'booking_approved' ? 'bg-gradient-to-br from-green-100 to-green-200'
+                                    : notif.type === 'wishlist_read' ? 'bg-gradient-to-br from-blue-100 to-blue-200'
+                                    : 'bg-gradient-to-br from-red-100 to-red-200'}
+                                `}>
                                   {notif.type === 'booking_approved' ? (
                                     <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : notif.type === 'wishlist_read' ? (
+                                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                   ) : (

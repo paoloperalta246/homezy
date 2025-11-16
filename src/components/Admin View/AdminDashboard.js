@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+
+import { collection, doc, getDoc, getDocs, updateDoc, addDoc, query, where } from "firebase/firestore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, getDocs, collection, orderBy, query, where } from "firebase/firestore";
+
 import { auth, db } from "../../firebase";
 import homezyLogo from "../Host View/images/homezy-logo.png";
-import { LayoutDashboard, Users, DollarSign, FileText, Shield, Settings, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Users, DollarSign, FileText, Shield, Settings, LogOut, User, Book } from "lucide-react";
 
 const AdminDashboard = () => {
   const [admin, setAdmin] = useState(null);
@@ -13,6 +17,11 @@ const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [serviceFeesTotal, setServiceFeesTotal] = useState(null);
   const [guestWishlists, setGuestWishlists] = useState([]);
+  // Track which wishlists have been marked as read (by id)
+  const [readWishlists, setReadWishlists] = useState([]);
+  // Toast/modal state
+  const [showReadToast, setShowReadToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
   // Derived: recent bookings (last 5, sorted by createdAt desc)
   const recentBookings = [...bookings]
     .sort((a, b) => {
@@ -33,6 +42,209 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+
+
+  // PDF Export helpers (Enhanced for professional look)
+  // Helper: Add header with logo and title
+  const addPDFHeader = (doc, title, accentColor = [236, 72, 153]) => {
+    // Draw colored header background
+    doc.setFillColor(...accentColor);
+    doc.rect(0, 0, 210, 28, 'F');
+    // Removed logo for cleaner header
+    // Title
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 16, 18); // Start title closer to the left
+    // Brand line
+    doc.setDrawColor(...accentColor);
+    doc.setLineWidth(1.2);
+    doc.line(0, 28, 210, 28);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont('helvetica', 'normal');
+  };
+
+  // Helper: Add footer with page number and date
+  const addPDFFooter = (doc, accentColor = [236, 72, 153]) => {
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.setTextColor(...accentColor);
+      doc.text(`Generated: ${new Date().toLocaleDateString()} | Page ${i} of ${pageCount}`,
+        105, 292, { align: 'center' });
+    }
+  };
+
+  // Helper: Watermark (optional)
+  const addPDFWatermark = (doc, text = "Homezy", color = [236, 72, 153]) => {
+    doc.setFontSize(40);
+    doc.setTextColor(...color, 30); // 30 alpha for watermark
+    doc.text(text, 105, 150, { align: 'center', angle: 30 });
+    doc.setTextColor(40, 40, 40);
+  };
+
+  // Enhanced Wishlists PDF
+  const exportWishlistsPDF = () => {
+    if (!guestWishlists.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Guest Wishlists", [236, 72, 153]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Guest", "Email", "Wishlist", "Date Added"]],
+      body: guestWishlists.map(w => [
+        w.guestName || '',
+        w.guestEmail || '',
+        w.text || w.itemName || w.title || w.name || '',
+        w.createdAt?.seconds
+          ? new Date(w.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : w.createdAt ? new Date(w.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ''
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [236, 72, 153], lineWidth: 0.2 },
+      headStyles: { fillColor: [236, 72, 153], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [255, 245, 250] },
+      tableLineColor: [236, 72, 153],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      didDrawPage: (data) => {
+        // Watermark (optional)
+        // addPDFWatermark(doc, "Homezy", [236, 72, 153]);
+      },
+    });
+    addPDFFooter(doc, [236, 72, 153]);
+    doc.save(`guest_wishlists_${Date.now()}.pdf`);
+  };
+
+  // Enhanced Recent Bookings PDF
+  const exportRecentBookingsPDF = () => {
+    if (!recentBookings.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Recent Bookings", [59, 130, 246]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Property", "Guest", "Email", "Check-in", "Check-out", "Amount"]],
+      body: recentBookings.map(b => [
+        b.listingTitle || '',
+        b.guestName || '',
+        b.guestEmail || '',
+        b.checkIn?.seconds
+          ? new Date(b.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : b.checkIn ? new Date(b.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : '',
+        b.checkOut?.seconds
+          ? new Date(b.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : b.checkOut ? new Date(b.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : '',
+        `₱${(b.finalPrice || b.price || 0).toLocaleString()}.00`
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [59, 130, 246], lineWidth: 0.2 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [239, 246, 255] },
+      tableLineColor: [59, 130, 246],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      didDrawPage: (data) => {
+        // addPDFWatermark(doc, "Homezy", [59, 130, 246]);
+      },
+    });
+    addPDFFooter(doc, [59, 130, 246]);
+    doc.save(`recent_bookings_${Date.now()}.pdf`);
+  };
+
+  // Enhanced Best Reviews PDF
+  const exportBestReviewsPDF = () => {
+    const best = reviews.filter(r => typeof r.rating === 'number').sort((a, b) => b.rating - a.rating).slice(0, 5);
+    if (!best.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Best Reviewed Bookings", [16, 185, 129]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Property", "Guest", "Email", "Rating", "Comment"]],
+      body: best.map(r => [
+        r.listingName || r.listingTitle || '',
+        r.name || '',
+        r.email || '',
+        r.rating,
+        r.comment || ''
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [16, 185, 129], lineWidth: 0.2 },
+      headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [236, 253, 245] },
+      tableLineColor: [16, 185, 129],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      columnStyles: { 4: { cellWidth: 60 } },
+      didDrawPage: (data) => {
+        // addPDFWatermark(doc, "Homezy", [16, 185, 129]);
+      },
+    });
+    addPDFFooter(doc, [16, 185, 129]);
+    doc.save(`best_reviews_${Date.now()}.pdf`);
+  };
+
+  // Enhanced Lowest Reviews PDF
+  const exportLowestReviewsPDF = () => {
+    const lowest = reviews.filter(r => typeof r.rating === 'number').sort((a, b) => a.rating - b.rating).slice(0, 5);
+    if (!lowest.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Lowest Reviewed Bookings", [239, 68, 68]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Property", "Guest", "Email", "Rating", "Comment"]],
+      body: lowest.map(r => [
+        r.listingName || r.listingTitle || '',
+        r.name || '',
+        r.email || '',
+        r.rating,
+        r.comment || ''
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [239, 68, 68], lineWidth: 0.2 },
+      headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [254, 242, 242] },
+      tableLineColor: [239, 68, 68],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      columnStyles: { 4: { cellWidth: 60 } },
+      didDrawPage: (data) => {
+        // addPDFWatermark(doc, "Homezy", [239, 68, 68]);
+      },
+    });
+    addPDFFooter(doc, [239, 68, 68]);
+    doc.save(`lowest_reviews_${Date.now()}.pdf`);
+  };
+
+  // Mark wishlist as read and notify guest
+  const handleMarkWishlistAsRead = async (wishlist) => {
+    // Disable button immediately
+    setReadWishlists((prev) => [...prev, wishlist.id]);
+    // Show toast/modal
+    setToastMsg('Wishlist has been marked as read!');
+    setShowReadToast(true);
+    setTimeout(() => setShowReadToast(false), 2500);
+    // Optionally update wishlist as read in Firestore
+    try {
+      if (wishlist.id) {
+        await updateDoc(doc(db, "guestWishlist", wishlist.id), { read: true });
+      }
+    } catch (e) {
+      // ignore if fails
+    }
+    // Send notification to guest
+    try {
+      const guestId = wishlist.guestId || wishlist.guestUid || wishlist.uid || wishlist.userId;
+      if (!guestId) return;
+      await addDoc(collection(db, "guestNotifications"), {
+        userId: guestId,
+        type: "wishlist_read",
+        title: "Wishlist Read by Admin",
+        message: "Your wishlist has been read by the admin.",
+        timestamp: new Date(),
+        read: false,
+        wishlistId: wishlist.id || null,
+      });
+    } catch (e) {
+      console.error("Failed to send notification to guest:", e);
+    }
+  };
+
   // Fetch all bookings and reviews for dynamic sections
   useEffect(() => {
     const fetchData = async () => {
@@ -195,11 +407,12 @@ const AdminDashboard = () => {
           <nav className="flex flex-col mt-4">
             {getNavItem("/admin-dashboard", "Dashboard", LayoutDashboard)}
             {/* <div className="border-t border-gray-300 my-4 mx-6"></div> */}
+            {getNavItem("/reservations", "Reservations", Book)}
             {getNavItem("/guests-hosts", "Guests & Hosts", Users)}
             {getNavItem("/service-fees", "Service Fees", DollarSign)}
-            {getNavItem("/admin-compliance", "Compliance", Shield)}
-            {getNavItem("/admin-reports", "Reports", FileText)}
-            {getNavItem("/admin-settings", "Settings", Settings)}
+            {getNavItem("/policy-compliance", "Policy & Compliance", Shield)}
+            {/* {getNavItem("/admin-reports", "Reports", FileText)}
+            {getNavItem("/admin-settings", "Settings", Settings)} */}
           </nav>
         </div>
 
@@ -313,28 +526,40 @@ const AdminDashboard = () => {
               </div>
               <span>Guest Wishlists</span>
             </h3>
+            <button
+              onClick={exportWishlistsPDF}
+              className="group relative bg-gradient-to-r from-pink-500 to-pink-400 via-pink-600 to-pink-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-300"
+              style={{ minWidth: 140 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Wishlists PDF</span>
+              <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md w-full max-w-full overflow-x-auto">
             {/* Desktop/tablet table */}
-            <table className="w-full max-w-full hidden sm:table table-fixed">
+            <table className="w-full max-w-full hidden sm:table" style={{ tableLayout: 'fixed' }}>
               <thead className="bg-gradient-to-r from-pink-50 to-pink-100 border-b-2 border-pink-200">
                 <tr>
-                  <th className="w-1/4 px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Guest</th>
-                  <th className="w-1/4 px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
-                  <th className="w-1/4 px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Wishlist</th>
-                  <th className="w-1/4 px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date Added</th>
+                  <th style={{ width: '20%' }} className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Guest</th>
+                  <th style={{ width: '20%' }} className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                  <th style={{ width: '20%' }} className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Wishlist</th>
+                  <th style={{ width: '20%' }} className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date Added</th>
+                  <th style={{ width: '20%' }} className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingData ? (
                   <tr>
-                    <td className="px-3 sm:px-4 md:px-6 py-4 text-pink-400 italic" colSpan={4}>
+                    <td className="px-3 sm:px-4 md:px-6 py-4 text-pink-400 italic" colSpan={5}>
                       Loading wishlists...
                     </td>
                   </tr>
                 ) : guestWishlists.length === 0 ? (
                   <tr>
-                    <td className="px-3 sm:px-4 md:px-6 py-4 text-gray-400 italic" colSpan={4}>
+                    <td className="px-3 sm:px-4 md:px-6 py-4 text-gray-400 italic" colSpan={5}>
                       No wishlists found.
                     </td>
                   </tr>
@@ -362,11 +587,26 @@ const AdminDashboard = () => {
                       <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">{w.createdAt?.seconds
                         ? new Date(w.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : w.createdAt ? new Date(w.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
+                      <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+                        <button
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow transition ${readWishlists.includes(w.id) || w.read ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                          onClick={() => handleMarkWishlistAsRead(w)}
+                          disabled={readWishlists.includes(w.id) || w.read}
+                        >
+                          {readWishlists.includes(w.id) || w.read ? 'Marked as Read' : 'Mark as Read'}
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+            {/* Toast/Modal for Mark as Read */}
+            {showReadToast && (
+              <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-[99999] bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg text-lg font-semibold animate-fade-in">
+                {toastMsg}
+              </div>
+            )}
             {/* Mobile stacked cards */}
             <div className="flex flex-col gap-3 sm:hidden p-1">
               {loadingData ? (
@@ -408,6 +648,17 @@ const AdminDashboard = () => {
               </div>
               <span>Recent Bookings</span>
             </h3>
+            <button
+              onClick={exportRecentBookingsPDF}
+              className="group relative bg-gradient-to-r from-blue-500 to-blue-400 via-blue-600 to-blue-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              style={{ minWidth: 140 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Bookings PDF</span>
+              <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (
@@ -511,6 +762,17 @@ const AdminDashboard = () => {
               </div>
               <span>Best Reviewed Bookings</span>
             </h3>
+            <button
+              onClick={exportBestReviewsPDF}
+              className="group relative bg-gradient-to-r from-green-500 to-green-400 via-green-600 to-green-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300"
+              style={{ minWidth: 140 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Best Reviews</span>
+              <span className="absolute -top-2 -right-2 bg-green-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (
@@ -610,6 +872,17 @@ const AdminDashboard = () => {
               </div>
               <span>Lowest Reviewed Bookings</span>
             </h3>
+            <button
+              onClick={exportLowestReviewsPDF}
+              className="group relative bg-gradient-to-r from-red-500 to-red-400 via-red-600 to-red-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-red-400 focus:outline-none focus:ring-2 focus:ring-red-300"
+              style={{ minWidth: 140 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Lowest Reviews</span>
+              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (

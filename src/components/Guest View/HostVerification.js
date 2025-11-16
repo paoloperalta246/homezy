@@ -1,7 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Check, Shield, Star, Sparkles, ArrowRight, ArrowLeft, Lock, Users, TrendingUp } from "lucide-react";
 import logo from "./homezy-logo.png";
-import { doc, setDoc, serverTimestamp, addDoc, collection } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, addDoc, collection, getDocs } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { useNavigate } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
@@ -29,12 +29,69 @@ export default function HostVerification() {
   const emailSendInFlightRef = useRef(false); // Prevent duplicate email send
   const navigate = useNavigate();
 
-  // Define this at the top of your component, before the return statement
-  const priceMap = {
-    basic: 500,
-    pro: 1200,
-    premium: 4500,
-  };
+
+  // Subscription plans state (fetched from Firestore)
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [priceMap, setPriceMap] = useState({});
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setPlansLoading(true);
+      try {
+        const plansSnap = await getDocs(collection(db, "subscriptionPlans"));
+        let plans = plansSnap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+        // If no plans exist, fallback to defaults (should not happen if admin seeded)
+        if (plans.length === 0) {
+          plans = [
+            {
+              id: "basic",
+              name: "Basic",
+              price: 500,
+              period: "month",
+              description: "Perfect for getting started",
+              features: ["Up to 5 property listings", "Basic analytics dashboard", "Email support within 48hrs", "Standard listing visibility"],
+              popular: false,
+              savings: null
+            },
+            {
+              id: "pro",
+              name: "Pro",
+              price: 1200,
+              period: "3 months",
+              description: "Most popular for serious hosts",
+              features: ["Up to 20 property listings", "Advanced analytics & insights", "Priority support within 24hrs", "Enhanced listing visibility", "Marketing tools access"],
+              popular: true,
+              savings: "Save ₱259.00"
+            },
+            {
+              id: "premium",
+              name: "Premium",
+              price: 4500,
+              period: "year",
+              description: "Maximum value for professionals",
+              features: ["Unlimited property listings", "Premium analytics suite", "24/7 dedicated phone support", "Featured homepage placement", "Full marketing automation", "Personal account manager"],
+              popular: false,
+              savings: "Save ₱799.00"
+            },
+          ];
+        }
+        // Sort plans: basic, pro, premium
+        const order = ["basic", "pro", "premium"];
+        plans.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        setSubscriptionPlans(plans);
+        // Build priceMap for quick lookup
+        const map = {};
+        plans.forEach(p => { map[p.id] = p.price; });
+        setPriceMap(map);
+      } catch (e) {
+        console.error("Failed to fetch subscription plans", e);
+      } finally {
+        setPlansLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
 
 
   const handleChange = (e) => {
@@ -123,41 +180,12 @@ export default function HostVerification() {
     }, 3000);
   };
 
-  const subscriptionPlans = [
-    {
-      id: "basic",
-      name: "Basic",
-      price: 10,
-      period: "month",
-      description: "Perfect for getting started",
-      features: ["Up to 5 property listings", "Basic analytics dashboard", "Email support within 48hrs", "Standard listing visibility"],
-      icon: Shield,
-      popular: false,
-      savings: null
-    },
-    {
-      id: "pro",
-      name: "Pro",
-      price: 25,
-      period: "3 months",
-      description: "Most popular for serious hosts",
-      features: ["Up to 20 property listings", "Advanced analytics & insights", "Priority support within 24hrs", "Enhanced listing visibility", "Marketing tools access"],
-      icon: Star,
-      popular: true,
-      savings: "Save ₱259.00"
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      price: 90,
-      period: "year",
-      description: "Maximum value for professionals",
-      features: ["Unlimited property listings", "Premium analytics suite", "24/7 dedicated phone support", "Featured homepage placement", "Full marketing automation", "Personal account manager"],
-      icon: Sparkles,
-      popular: false,
-      savings: "Save ₱799.00"
-    },
-  ];
+  // Map plan id to icon
+  const planIcons = {
+    basic: Shield,
+    pro: Star,
+    premium: Sparkles,
+  };
 
   const steps = [
     { number: 1, title: "Your Details", description: "Basic information" },
@@ -368,110 +396,102 @@ export default function HostVerification() {
               <h2 className="text-3xl font-bold text-gray-900 mb-3">Choose Your Plan</h2>
               <p className="text-lg text-gray-600">Select the perfect plan for your hosting journey</p>
             </div>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              {subscriptionPlans.map((p) => {
-                const IconComponent = p.icon;
-
-                const pricePHP = priceMap[p.id].toLocaleString();
-
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => handlePlanChange(p.id)}
-                    className={`relative cursor-pointer rounded-2xl border-2 transition-all transform hover:scale-105 ${plan === p.id
-                      ? "border-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 shadow-2xl"
-                      : "border-gray-200 bg-white hover:border-orange-200 shadow-lg hover:shadow-xl"
-                      } ${p.popular ? 'md:-mt-4 md:mb-4' : ''}`}
-                  >
-                    {p.popular && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold rounded-full shadow-lg">
-                        MOST POPULAR
-                      </div>
-                    )}
-
-                    {p.savings && (
-                      <div className="absolute top-4 right-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
-                        {p.savings}
-                      </div>
-                    )}
-
-                    <div className="p-8">
-                      <div className={`inline-flex p-3 rounded-xl mb-4 ${plan === p.id ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                        <IconComponent className="w-6 h-6" />
-                      </div>
-
-                      <h3 className="text-2xl font-bold text-gray-900 mb-2">{p.name}</h3>
-                      <p className="text-gray-600 text-sm mb-6">{p.description}</p>
-
-                      <div className="mb-6">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-bold text-gray-900">₱{pricePHP}.00</span>
-                          <span className="text-gray-600">/ {p.period}</span>
+            {plansLoading ? (
+              <div className="text-orange-400 text-center py-8 text-lg">Loading plans...</div>
+            ) : (
+              <>
+                <div className="grid md:grid-cols-3 gap-6 mb-8">
+                  {subscriptionPlans.map((p) => {
+                    const IconComponent = planIcons[p.id] || Shield;
+                    const pricePHP = (priceMap[p.id] || 0).toLocaleString();
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => handlePlanChange(p.id)}
+                        className={`relative cursor-pointer rounded-2xl border-2 transition-all transform hover:scale-105 ${plan === p.id
+                          ? "border-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 shadow-2xl"
+                          : "border-gray-200 bg-white hover:border-orange-200 shadow-lg hover:shadow-xl"
+                          } ${p.popular ? 'md:-mt-4 md:mb-4' : ''}`}
+                      >
+                        {p.popular && (
+                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold rounded-full shadow-lg">
+                            MOST POPULAR
+                          </div>
+                        )}
+                        {p.savings && (
+                          <div className="absolute top-4 right-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
+                            {p.savings}
+                          </div>
+                        )}
+                        <div className="p-8">
+                          <div className={`inline-flex p-3 rounded-xl mb-4 ${plan === p.id ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                            <IconComponent className="w-6 h-6" />
+                          </div>
+                          <h3 className="text-2xl font-bold text-gray-900 mb-2">{p.name}</h3>
+                          <p className="text-gray-600 text-sm mb-6">{p.description}</p>
+                          <div className="mb-6">
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl font-bold text-gray-900">₱{pricePHP}.00</span>
+                              <span className="text-gray-600">/ {p.period}</span>
+                            </div>
+                          </div>
+                          <ul className="space-y-3 mb-8">
+                            {p.features && p.features.map((feature, idx) => (
+                              <li key={idx} className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center mt-0.5">
+                                  <Check className="w-3 h-3 text-green-600" />
+                                </div>
+                                <span className="text-sm text-gray-700">{feature}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className={`w-full py-3 rounded-xl font-semibold text-center transition ${plan === p.id
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-600'
+                            }`}>
+                            {plan === p.id ? 'Selected' : 'Select Plan'}
+                          </div>
                         </div>
                       </div>
-
-                      <ul className="space-y-3 mb-8">
-                        {p.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-5 h-5 bg-green-100 rounded-full flex items-center justify-center mt-0.5">
-                              <Check className="w-3 h-3 text-green-600" />
-                            </div>
-                            <span className="text-sm text-gray-700">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      <div className={`w-full py-3 rounded-xl font-semibold text-center transition ${plan === p.id
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}>
-                        {plan === p.id ? 'Selected' : 'Select Plan'}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row gap-4 max-w-2xl mx-auto">
-              <button
-                onClick={() => setCurrentStep(1)}
-                className="w-full sm:flex-1 flex items-center justify-center gap-2 bg-white border-2 border-gray-300 text-gray-700 font-semibold py-4 rounded-xl hover:bg-gray-50 transition"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                Back
-              </button>
-
-              <button
-                onClick={async () => {
-                  try {
-                    // Validate fields first
-                    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-                      alert("❌ Please fill out all required fields before continuing!");
-                      return;
-                    }
-                    if (formData.password !== formData.confirmPassword) {
-                      alert("❌ Passwords do not match!");
-                      return;
-                    }
-
-                    // ✅ Create Firebase user before payment and store the UID
-                    const userUid = await createFirebaseUser();
-                    setCreatedUserUid(userUid); // Store the UID for later use
-
-                    setCurrentStep(3); // now move to payment
-                  } catch (err) {
-                    alert("❌ Could not create user. " + err.message);
-                  }
-                }}
-                className="w-full sm:flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-4 rounded-xl hover:from-orange-600 hover:to-amber-600 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
-              >
-                Continue to Payment
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-col-reverse sm:flex-row gap-4 max-w-2xl mx-auto">
+                  <button
+                    onClick={() => setCurrentStep(1)}
+                    className="w-full sm:flex-1 flex items-center justify-center gap-2 bg-white border-2 border-gray-300 text-gray-700 font-semibold py-4 rounded-xl hover:bg-gray-50 transition"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                    Back
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        // Validate fields first
+                        if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
+                          alert("❌ Please fill out all required fields before continuing!");
+                          return;
+                        }
+                        if (formData.password !== formData.confirmPassword) {
+                          alert("❌ Passwords do not match!");
+                          return;
+                        }
+                        // ✅ Create Firebase user before payment and store the UID
+                        const userUid = await createFirebaseUser();
+                        setCreatedUserUid(userUid); // Store the UID for later use
+                        setCurrentStep(3); // now move to payment
+                      } catch (err) {
+                        alert("❌ Could not create user. " + err.message);
+                      }
+                    }}
+                    className="w-full sm:flex-1 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold py-4 rounded-xl hover:from-orange-600 hover:to-amber-600 transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  >
+                    Continue to Payment
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -491,13 +511,13 @@ export default function HostVerification() {
                   </div>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">
-                  ₱{priceMap[plan].toLocaleString()}.00
+                  ₱{(priceMap[plan] || 0).toLocaleString()}.00
                 </div>
               </div>
               <div className="flex items-center justify-between pt-4">
                 <span className="font-semibold text-gray-900">Total Due Today</span>
                 <span className="text-2xl font-bold text-orange-600">
-                  ₱{priceMap[plan].toLocaleString()}.00
+                  ₱{(priceMap[plan] || 0).toLocaleString()}.00
                 </span>
               </div>
             </div>
@@ -557,7 +577,7 @@ export default function HostVerification() {
                                   {
                                     description: `${subscriptionPlans.find(p => p.id === plan)?.name} Plan`,
                                     amount: {
-                                      value: priceMap[plan].toString(), // Use PHP priceMap
+                                      value: (priceMap[plan] || 0).toString(),
                                       currency_code: "PHP",
                                     },
                                   },
@@ -604,7 +624,14 @@ export default function HostVerification() {
 
                                 // 🔵 Step 1.5: Create serviceFees document for this host (mark as paid)
                                 const now = new Date();
-                                const planDuration = (plan === 'basic') ? 1 : (plan === 'pro') ? 3 : (plan === 'premium') ? 12 : 1;
+                                // Get plan duration from Firestore plan period
+                                let planDuration = 1;
+                                const selectedPlan = subscriptionPlans.find(p => p.id === plan);
+                                if (selectedPlan) {
+                                  if (selectedPlan.period.includes('year')) planDuration = 12;
+                                  else if (selectedPlan.period.includes('3')) planDuration = 3;
+                                  else if (selectedPlan.period.includes('month')) planDuration = 1;
+                                }
                                 const expirationDate = new Date(now);
                                 expirationDate.setMonth(expirationDate.getMonth() + planDuration);
                                 await addDoc(collection(db, "serviceFees"), {

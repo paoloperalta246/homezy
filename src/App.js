@@ -34,6 +34,8 @@ import TransactionHistory from './components/Guest View/TransactionHistory';
 import GuestWishlist from './components/Guest View/GuestWishlist';
 import GuestsHosts from './components/Admin View/GuestsHosts';
 import ServiceFees from './components/Admin View/ServiceFees';
+import PolicyCompliance from './components/Admin View/PolicyCompliance';
+import Reservations from './components/Admin View/Reservations';
 
 function App() {
   return (
@@ -73,6 +75,8 @@ function App() {
         <Route path="/guest-wishlist" element={<GuestWishlist />} />
         <Route path="/guests-hosts" element={<GuestsHosts />} />
         <Route path="/service-fees" element={<ServiceFees />} />
+        <Route path="/policy-compliance" element={<PolicyCompliance />} />
+        <Route path="/reservations" element={<Reservations />} />
       </Routes>
     </Router>
   );

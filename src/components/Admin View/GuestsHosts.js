@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, getDocs, collection, orderBy, query, where, updateDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import homezyLogo from "../Host View/images/homezy-logo.png";
-import { LayoutDashboard, Users, DollarSign, FileText, Shield, Settings, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Users, DollarSign, FileText, Shield, Settings, LogOut, User, Book } from "lucide-react";
 
 const GuestsHosts = () => {
   const [admin, setAdmin] = useState(null);
@@ -22,6 +24,88 @@ const GuestsHosts = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+
+// PDF Export helpers (Professional look, no logo)
+  const addPDFHeader = (doc, title, accentColor = [59, 130, 246]) => {
+    doc.setFillColor(...accentColor);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, 16, 18);
+    doc.setDrawColor(...accentColor);
+    doc.setLineWidth(1.2);
+    doc.line(0, 28, 210, 28);
+    doc.setTextColor(40, 40, 40);
+    doc.setFont('helvetica', 'normal');
+  };
+
+  const addPDFFooter = (doc, accentColor = [59, 130, 246]) => {
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.setTextColor(...accentColor);
+      doc.text(`Generated: ${new Date().toLocaleDateString()} | Page ${i} of ${pageCount}`,
+        105, 292, { align: 'center' });
+    }
+  };
+
+
+  // Export Hosts Only
+  const exportHostsPDF = () => {
+    if (!hosts.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Hosts", [139, 92, 246]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Name", "Email", "Plan", "Phone", "Status"]],
+      body: hosts.map(h => [
+        h.fullName || '',
+        h.email || '',
+        h.subscriptionPlan ? (h.subscriptionPlan.charAt(0).toUpperCase() + h.subscriptionPlan.slice(1)) : '-',
+        h.phone || '-',
+        h.verified ? 'Verified' : 'Unverified',
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [139, 92, 246], lineWidth: 0.2 },
+      headStyles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [237, 233, 254] },
+      tableLineColor: [139, 92, 246],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      didDrawPage: (data) => {},
+    });
+    addPDFFooter(doc, [139, 92, 246]);
+    doc.save(`hosts_${Date.now()}.pdf`);
+  };
+
+  // Export Guests Only
+  const exportGuestsPDF = () => {
+    if (!guests.length) return;
+    const doc = new jsPDF();
+    addPDFHeader(doc, "Guests", [251, 146, 60]);
+    autoTable(doc, {
+      startY: 34,
+      head: [["Name", "Email", "Phone", "Status"]],
+      body: guests.map(g => [
+        g.fullName || '',
+        g.email || '',
+        g.phone || '-',
+        g.verified ? 'Verified' : 'Unverified',
+      ]),
+      styles: { fontSize: 11, cellPadding: 4, lineColor: [251, 146, 60], lineWidth: 0.2 },
+      headStyles: { fillColor: [251, 146, 60], textColor: 255, fontStyle: 'bold', fontSize: 12 },
+      alternateRowStyles: { fillColor: [255, 247, 237] },
+      tableLineColor: [251, 146, 60],
+      tableLineWidth: 0.2,
+      margin: { left: 10, right: 10 },
+      didDrawPage: (data) => {},
+    });
+    addPDFFooter(doc, [251, 146, 60]);
+    doc.save(`guests_${Date.now()}.pdf`);
+  };
+
+
   // Fetch all bookings and reviews for dynamic sections
   useEffect(() => {
     const fetchData = async () => {
@@ -224,11 +308,12 @@ const GuestsHosts = () => {
           <nav className="flex flex-col mt-4">
             {getNavItem("/admin-dashboard", "Dashboard", LayoutDashboard)}
             {/* <div className="border-t border-gray-300 my-4 mx-6"></div> */}
+            {getNavItem("/reservations", "Reservations", Book)}
             {getNavItem("/guests-hosts", "Guests & Hosts", Users)}
             {getNavItem("/service-fees", "Service Fees", DollarSign)}
-            {getNavItem("/admin-compliance", "Compliance", Shield)}
-            {getNavItem("/admin-reports", "Reports", FileText)}
-            {getNavItem("/admin-settings", "Settings", Settings)}
+            {getNavItem("/policy-compliance", "Policy & Compliance", Shield)}
+            {/* {getNavItem("/admin-reports", "Reports", FileText)}
+            {getNavItem("/admin-settings", "Settings", Settings)} */}
           </nav>          
         </div>
 
@@ -272,12 +357,26 @@ const GuestsHosts = () => {
           <p className="text-[#5E6282] text-sm sm:text-base md:text-lg mb-6 sm:mb-8">
             View detailed information about all guests and hosts.
           </p>
+
         </div>
         {/* Hosts Table - Modern UI */}
         <div className="mb-12">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <User className="w-5 h-5 text-purple-600" /> Hosts
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <User className="w-5 h-5 text-purple-600" /> Hosts
+            </h3>
+            <button
+              onClick={exportHostsPDF}
+              className="group bg-gradient-to-r from-purple-500 to-purple-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 relative"
+              style={{ minWidth: 160 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Hosts PDF</span>
+              <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
+          </div>
           {/* Table wrapper is horizontally scrollable, cards are not */}
           <div className="bg-white border border-purple-100 rounded-2xl shadow-xl">
             {loadingData ? (
@@ -371,9 +470,22 @@ const GuestsHosts = () => {
 
         {/* Guests Table - Modern UI */}
         <div className="mb-12">
-          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-orange-600" /> Guests
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Users className="w-5 h-5 text-orange-600" /> Guests
+            </h3>
+            <button
+              onClick={exportGuestsPDF}
+              className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
+              style={{ minWidth: 160 }}
+            >
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              </span>
+              <span className="tracking-wide">Export Guests PDF</span>
+              <span className="absolute -top-2 -right-2 bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
+            </button>
+          </div>
           {/* Table wrapper is horizontally scrollable, cards are not */}
           <div className="bg-white border border-orange-100 rounded-2xl shadow-xl">
             {loadingData ? (

@@ -330,6 +330,35 @@ const Compliance = () => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // --- Policy & Compliance Firestore fetch ---
+    const [policies, setPolicies] = useState([]);
+    const [loadingPolicies, setLoadingPolicies] = useState(true);
+    useEffect(() => {
+        const fetchPolicies = async () => {
+            setLoadingPolicies(true);
+            try {
+                const snap = await getDocs(collection(db, "policies"));
+                if (!snap.empty) {
+                    setPolicies(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                } else {
+                    setPolicies([]);
+                }
+            } catch (e) {
+                setPolicies([]);
+            } finally {
+                setLoadingPolicies(false);
+            }
+        };
+        fetchPolicies();
+    }, []);
+
+    // Helper to get policy by type or title
+    const getPolicy = (typeOrTitle) =>
+        policies.find(
+            p => p.type?.toLowerCase().includes(typeOrTitle.toLowerCase()) ||
+                p.title?.toLowerCase().includes(typeOrTitle.toLowerCase())
+        );
+
     return (
         <div className="font-sans bg-[#fefefe] min-h-screen flex flex-col">
             <header className="sticky top-0 left-0 w-full bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm z-50">
@@ -680,390 +709,123 @@ const Compliance = () => {
                 )}
             </header>
 
-            {/* Compliance & Regulatory Section */}
-            <main className="flex-1 w-full mx-auto px-4 sm:px-6 lg:px-10 py-10 sm:py-16 bg-gradient-to-b from-white via-orange-50/20 to-white">
-                {/* Hero Section */}
-                <div className="max-w-7xl mx-auto mb-10 sm:mb-14">
-                    <div className="flex items-start gap-5">
-                        <div className="shrink-0 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-400 text-white p-4 shadow-lg">
-                            <Shield className="w-8 h-8" />
+
+
+            {/* Main Content: Policy & Compliance (dynamic from Firestore) */}
+            <main className="flex-1 bg-gradient-to-br from-[#f8fafc] to-[#f3e8ff] py-12 px-4 sm:px-8 lg:px-24">
+                <div className="max-w-3xl mx-auto">
+                    <div className="bg-white/90 shadow-2xl rounded-3xl border border-gray-100 p-8 sm:p-12 relative overflow-hidden">
+                        <div className="absolute -top-10 -right-10 opacity-10 pointer-events-none select-none">
+                            <Shield className="w-40 h-40 text-orange-400" />
                         </div>
-                        <div>
-                            <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#0B2545] mb-3">
-                                Compliance & Regulatory Standards
-                            </h2>
-                            <p className="mt-3 text-gray-600 text-base sm:text-lg max-w-4xl leading-relaxed">
-                                Your trust is our priority. At Homezy, we uphold the highest standards of privacy, security, and transparency.
-                                Our platform operates in full compliance with Philippine laws and international best practices to ensure a safe,
-                                fair, and secure experience for all users—whether you're a guest or a host.
-                            </p>
-                        </div>
+                        <h2 className="text-4xl font-extrabold text-[#0B2545] mb-8 flex items-center gap-3">
+                            <FileCheck className="w-8 h-8 text-orange-500" />
+                            Policy & Compliance
+                        </h2>
+                        {loadingPolicies ? (
+                            <div className="text-center text-gray-400 py-12 text-lg font-medium animate-pulse">Loading policies...</div>
+                        ) : (
+                            <div className="space-y-10">
+                                {/* Cancellation Policy */}
+                                {getPolicy('cancellation') && (
+                                    <section className="rounded-2xl border-l-4 border-orange-400 bg-orange-50/60 p-6 shadow-sm">
+                                        <h3 className="text-2xl font-semibold text-orange-500 mb-2 flex items-center gap-2">
+                                            <AlertTriangle className="inline w-6 h-6" /> Cancellation Policy
+                                        </h3>
+                                        <div className="text-gray-700 whitespace-pre-line leading-relaxed text-base">{getPolicy('cancellation').content}</div>
+                                    </section>
+                                )}
+                                {/* Rules & Regulations */}
+                                {getPolicy('rule') && (
+                                    <section className="rounded-2xl border-l-4 border-purple-400 bg-purple-50/60 p-6 shadow-sm">
+                                        <h3 className="text-2xl font-semibold text-purple-600 mb-2 flex items-center gap-2">
+                                            <Shield className="inline w-6 h-6" /> House Rules & Regulations
+                                        </h3>
+                                        <div className="text-gray-700 whitespace-pre-line leading-relaxed text-base">{getPolicy('rule').content}</div>
+                                    </section>
+                                )}
+                                {/* Reports */}
+                                {getPolicy('report') && (
+                                    <section className="rounded-2xl border-l-4 border-blue-400 bg-blue-50/60 p-6 shadow-sm">
+                                        <h3 className="text-2xl font-semibold text-blue-600 mb-2 flex items-center gap-2">
+                                            <FileCheck className="inline w-6 h-6" /> Reporting Issues
+                                        </h3>
+                                        <div className="text-gray-700 whitespace-pre-line leading-relaxed text-base">{getPolicy('report').content}</div>
+                                    </section>
+                                )}
+                                {/* Contracts */}
+                                {getPolicy('contract') && (
+                                    <section className="rounded-2xl border-l-4 border-green-400 bg-green-50/60 p-6 shadow-sm">
+                                        <h3 className="text-2xl font-semibold text-green-600 mb-2 flex items-center gap-2">
+                                            <FileText className="inline w-6 h-6" /> Guest & Host Contracts
+                                        </h3>
+                                        <div className="text-gray-700 whitespace-pre-line leading-relaxed text-base">{getPolicy('contract').content}</div>
+                                    </section>
+                                )}
+                                {/* Other policies (Terms, Privacy, etc.) */}
+                                {(() => {
+                                    // Define a palette of accent colors
+                                    const colorPalette = [
+                                        {
+                                            border: 'border-pink-400',
+                                            bg: 'bg-pink-50/60',
+                                            text: 'text-pink-600',
+                                            icon: 'text-pink-400',
+                                        },
+                                        {
+                                            border: 'border-yellow-400',
+                                            bg: 'bg-yellow-50/60',
+                                            text: 'text-yellow-600',
+                                            icon: 'text-yellow-400',
+                                        },
+                                        {
+                                            border: 'border-teal-400',
+                                            bg: 'bg-teal-50/60',
+                                            text: 'text-teal-600',
+                                            icon: 'text-teal-400',
+                                        },
+                                        {
+                                            border: 'border-red-400',
+                                            bg: 'bg-red-50/60',
+                                            text: 'text-red-600',
+                                            icon: 'text-red-400',
+                                        },
+                                        {
+                                            border: 'border-indigo-400',
+                                            bg: 'bg-indigo-50/60',
+                                            text: 'text-indigo-600',
+                                            icon: 'text-indigo-400',
+                                        },
+                                        {
+                                            border: 'border-cyan-400',
+                                            bg: 'bg-cyan-50/60',
+                                            text: 'text-cyan-600',
+                                            icon: 'text-cyan-400',
+                                        },
+                                    ];
+                                    return policies
+                                        .filter(p => !['cancellation', 'rule', 'report', 'contract'].some(key => p.type?.toLowerCase().includes(key)))
+                                        .map((p, idx) => {
+                                            const color = colorPalette[idx % colorPalette.length];
+                                            return (
+                                                <section
+                                                    className={`rounded-2xl border-l-4 ${color.border} ${color.bg} p-6 shadow-sm`}
+                                                    key={p.id}
+                                                >
+                                                    <h3 className={`text-2xl font-semibold ${color.text} mb-2 flex items-center gap-2`}>
+                                                        <Info className={`inline w-6 h-6 ${color.icon}`} /> {p.title}
+                                                    </h3>
+                                                    <div className="text-gray-700 whitespace-pre-line leading-relaxed text-base">{p.content}</div>
+                                                </section>
+                                            );
+                                        });
+                                })()}
+                            </div>
+                        )}
                     </div>
-                </div>
-
-                {/* Trust Badges */}
-                <div className="max-w-7xl mx-auto mb-12">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm hover:shadow-md transition">
-                            <Lock className="w-8 h-8 text-orange-500 mx-auto mb-2" />
-                            <p className="text-xs font-semibold text-gray-700">Encrypted Payments</p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm hover:shadow-md transition">
-                            <Shield className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                            <p className="text-xs font-semibold text-gray-700">RA 10173 Compliant</p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm hover:shadow-md transition">
-                            <Eye className="w-8 h-8 text-indigo-500 mx-auto mb-2" />
-                            <p className="text-xs font-semibold text-gray-700">Full Transparency</p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm hover:shadow-md transition">
-                            <Headphones className="w-8 h-8 text-sky-500 mx-auto mb-2" />
-                            <p className="text-xs font-semibold text-gray-700">24/7 Support</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Content Grid */}
-                <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left: Main Content */}
-                    <div className="lg:col-span-2 space-y-8">
-
-                        {/* 1. Data Privacy & Security */}
-                        <section id="privacy" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-orange-100 rounded-lg p-2">
-                                    <Lock className="w-6 h-6 text-orange-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Data Privacy & Security</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                Homezy is committed to protecting your personal information in accordance with the <strong>Data Privacy Act of 2012 (Republic Act No. 10173)</strong>.
-                                We implement industry-leading security measures to safeguard your data.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Consent-Based Data Sharing:</strong> Your personal data is never sold or shared with third parties without your explicit consent.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">End-to-End Encryption:</strong> All payment transactions and sensitive data are encrypted using SSL/TLS protocols.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Regular Security Audits:</strong> We conduct quarterly security assessments and penetration testing to identify and fix vulnerabilities.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">User Control:</strong> You have the right to access, update, or delete your personal information at any time through your account settings.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 2. Terms of Service */}
-                        <section id="terms" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-indigo-100 rounded-lg p-2">
-                                    <FileText className="w-6 h-6 text-indigo-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Terms of Service</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                By using Homezy, you agree to comply with our terms and conditions. These terms govern the relationship between guests, hosts, and the platform.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <Info className="w-5 h-5 text-sky-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">User Eligibility:</strong> Users must be at least 18 years old and possess valid government-issued identification.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Info className="w-5 h-5 text-sky-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Account Responsibility:</strong> You are responsible for maintaining the confidentiality of your account credentials and all activities under your account.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Info className="w-5 h-5 text-sky-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Prohibited Activities:</strong> Fraudulent bookings, discrimination, harassment, property damage, and illegal activities are strictly prohibited.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Info className="w-5 h-5 text-sky-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Right to Suspend:</strong> Homezy reserves the right to suspend or terminate accounts that violate our policies without prior notice.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 3. Platform Regulations */}
-                        <section id="regulations" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-purple-100 rounded-lg p-2">
-                                    <Scale className="w-6 h-6 text-purple-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Host & Listing Regulations</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                All hosts and property listings on Homezy must comply with local, regional, and national regulations to ensure legal and ethical operation.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <Award className="w-5 h-5 text-amber-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Licensing & Permits:</strong> Hosts must obtain all necessary permits, including business permits and DOT accreditation where applicable.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Award className="w-5 h-5 text-amber-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Accurate Listings:</strong> Property descriptions, amenities, pricing, and photos must be truthful and up-to-date to prevent misleading guests.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Award className="w-5 h-5 text-amber-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Tax Compliance:</strong> Hosts are responsible for declaring income and paying applicable taxes in accordance with Philippine tax law.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Award className="w-5 h-5 text-amber-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Anti-Discrimination Policy:</strong> Hosts may not discriminate based on race, religion, nationality, gender, disability, or sexual orientation.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 4. Safety & Community Standards */}
-                        <section id="safety" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-rose-100 rounded-lg p-2">
-                                    <AlertTriangle className="w-6 h-6 text-rose-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Safety & Community Standards</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                We prioritize the safety and well-being of our community. All users—guests and hosts—are expected to uphold safety protocols and respectful conduct.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <Shield className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Property Safety:</strong> All properties must comply with fire safety codes, have working smoke detectors, and provide emergency contact information.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Shield className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Identity Verification:</strong> Both guests and hosts must complete identity verification to prevent fraud and ensure accountability.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Shield className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Respectful Communication:</strong> Harassment, hate speech, or abusive language will result in immediate account suspension.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Shield className="w-5 h-5 text-orange-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Violation Consequences:</strong> Repeated violations may lead to permanent removal from the platform and potential legal action.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 5. Payment & Refund Policy */}
-                        <section id="payments" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-emerald-100 rounded-lg p-2">
-                                    <CreditCard className="w-6 h-6 text-emerald-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Payment & Refund Policy</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                We use secure third-party payment processors to handle all transactions. Our refund policy ensures fairness for both guests and hosts.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Secure Transactions:</strong> All payments are processed through PayPal with PCI DSS Level 1 compliance.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Cancellation Policy:</strong> Refunds depend on the cancellation timeline—full refunds for cancellations 7+ days before check-in, 50% for 3-6 days, and no refund for less than 48 hours.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Host Payouts:</strong> Hosts receive payment 24 hours after guest check-in to ensure satisfaction.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Dispute Resolution:</strong> In case of payment disputes, Homezy acts as a neutral mediator and may withhold funds pending investigation.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 6. Legal Framework */}
-                        <section id="legal" className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 hover:shadow-2xl transition-shadow">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-slate-100 rounded-lg p-2">
-                                    <Globe className="w-6 h-6 text-slate-600" />
-                                </div>
-                                <h3 className="text-2xl font-bold text-[#0B2545]">Legal Framework & Jurisdiction</h3>
-                            </div>
-                            <p className="text-gray-600 mb-5 leading-relaxed">
-                                Homezy operates under the legal jurisdiction of the Republic of the Philippines and adheres to all applicable laws and regulations.
-                            </p>
-                            <ul className="space-y-4 text-gray-700">
-                                <li className="flex gap-3 items-start">
-                                    <FileCheck className="w-5 h-5 text-indigo-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Governing Law:</strong> All agreements are governed by Philippine law, and disputes are subject to the exclusive jurisdiction of Philippine courts.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <FileCheck className="w-5 h-5 text-indigo-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Consumer Protection:</strong> We comply with the Consumer Act of the Philippines (RA 7394) to protect the rights of platform users.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <FileCheck className="w-5 h-5 text-indigo-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Anti-Money Laundering:</strong> Homezy adheres to the Anti-Money Laundering Act (RA 9160) and reports suspicious transactions to the AMLC.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <FileCheck className="w-5 h-5 text-indigo-500 mt-1 shrink-0" />
-                                    <div>
-                                        <strong className="text-gray-900">Intellectual Property:</strong> All content, trademarks, and branding on Homezy are protected under Philippine intellectual property laws.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                        {/* 7. Reporting & Support */}
-                        <section id="reporting" className="bg-gradient-to-br from-orange-500 to-orange-400 rounded-3xl shadow-xl text-white p-8">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="bg-white/20 rounded-lg p-2">
-                                    <Headphones className="w-6 h-6 text-white" />
-                                </div>
-                                <h3 className="text-2xl font-bold">Reporting & 24/7 Support</h3>
-                            </div>
-                            <p className="mb-5 leading-relaxed text-white/95">
-                                If you encounter any issues, violations, or have questions about compliance, our dedicated support team is available around the clock.
-                            </p>
-                            <ul className="space-y-4">
-                                <li className="flex gap-3 items-start">
-                                    <AlertTriangle className="w-5 h-5 text-white/90 mt-1 shrink-0" />
-                                    <div>
-                                        <strong>Report Violations:</strong> If you witness policy violations, suspicious activity, or unsafe conditions, report immediately via email or through the in-app reporting feature.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Clock className="w-5 h-5 text-white/90 mt-1 shrink-0" />
-                                    <div>
-                                        <strong>24/7 Availability:</strong> Our support team is online 24/7 for urgent safety, security, or regulatory concerns.
-                                    </div>
-                                </li>
-                                <li className="flex gap-3 items-start">
-                                    <Mail className="w-5 h-5 text-white/90 mt-1 shrink-0" />
-                                    <div>
-                                        <strong>Contact Us:</strong> Email <a href="mailto:compliance@homezy.com" className="underline font-semibold">compliance@homezy.com</a> or call our hotline at <strong>+63 917 123 4567</strong>.
-                                    </div>
-                                </li>
-                            </ul>
-                        </section>
-
-                    </div>
-
-                    {/* Right: Sidebar */}
-                    <aside className="space-y-6">
-                        {/* Navigation */}
-                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
-                            <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-orange-500" />
-                                On This Page
-                            </h4>
-                            <nav className="text-sm text-gray-600">
-                                <ul className="space-y-3">
-                                    <li><a href="#privacy" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <Lock className="w-3.5 h-3.5" /> Data Privacy & Security
-                                    </a></li>
-                                    <li><a href="#terms" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <FileText className="w-3.5 h-3.5" /> Terms of Service
-                                    </a></li>
-                                    <li><a href="#regulations" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <Scale className="w-3.5 h-3.5" /> Host Regulations
-                                    </a></li>
-                                    <li><a href="#safety" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <AlertTriangle className="w-3.5 h-3.5" /> Safety Standards
-                                    </a></li>
-                                    <li><a href="#payments" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <CreditCard className="w-3.5 h-3.5" /> Payment & Refunds
-                                    </a></li>
-                                    <li><a href="#legal" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <Globe className="w-3.5 h-3.5" /> Legal Framework
-                                    </a></li>
-                                    <li><a href="#reporting" className="hover:text-orange-600 transition flex items-center gap-2">
-                                        <Headphones className="w-3.5 h-3.5" /> Reporting & Support
-                                    </a></li>
-                                </ul>
-                            </nav>
-                        </div>
-
-                        {/* Contact Card */}
-                        <div className="bg-gradient-to-br from-indigo-500 to-indigo-400 text-white rounded-3xl shadow-lg p-6">
-                            <div className="flex items-center gap-2 mb-3">
-                                <Mail className="w-5 h-5" />
-                                <h4 className="text-lg font-bold">Need Help?</h4>
-                            </div>
-                            <p className="text-white/90 text-sm mb-4 leading-relaxed">
-                                Our compliance and legal team is ready to answer your questions about policies, regulations, and account safety.
-                            </p>
-                            <a
-                                href="mailto:compliance@homezy.com"
-                                className="inline-flex items-center gap-2 bg-white text-indigo-600 font-semibold px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg transition w-full justify-center"
-                            >
-                                <Mail className="w-4 h-4" />
-                                Contact Compliance Team
-                            </a>
-                            <div className="mt-5 pt-4 border-t border-white/20">
-                                <p className="text-xs text-white/80 mb-1">📞 Hotline: <strong>+63 917 123 4567</strong></p>
-                                <p className="text-xs text-white/80">🕒 Available 24/7</p>
-                            </div>
-                        </div>
-
-                        {/* Last Updated */}
-                        <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 text-center">
-                            <Clock className="w-5 h-5 text-gray-500 mx-auto mb-2" />
-                            <p className="text-xs text-gray-600 font-medium">Last Updated</p>
-                            <p className="text-sm font-bold text-gray-800">December 15, 2024</p>
-                        </div>
-                    </aside>
                 </div>
             </main>
+
             <footer className="bg-gray-900 text-gray-300 py-10 sm:py-14 px-4 sm:px-6 lg:px-16">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10">
                     {/* Brand */}

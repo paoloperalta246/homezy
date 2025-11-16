@@ -33,6 +33,88 @@ const EMAIL_COOLDOWN_MS = 10000; // 10 seconds cooldown between sends to same em
 // � Firestore (Admin)
 const fs = getFirestore();
 
+// PayPal SDK setup
+const axios = require('axios');
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const PAYPAL_MODE = process.env.PAYPAL_MODE || 'sandbox';
+const PAYPAL_API_BASE = PAYPAL_MODE === 'live' ? 'https://api.paypal.com' : 'https://api.sandbox.paypal.com';
+
+// Helper: Get PayPal access token
+async function getPayPalAccessToken() {
+  const response = await axios({
+    url: `${PAYPAL_API_BASE}/v1/oauth2/token`,
+    method: 'post',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    auth: {
+      username: PAYPAL_CLIENT_ID,
+      password: PAYPAL_CLIENT_SECRET,
+    },
+    data: 'grant_type=client_credentials',
+  });
+  return response.data.access_token;
+}
+
+// POST /api/withdraw
+app.post('/api/withdraw', async (req, res) => {
+  const { amount, email, hostUid } = req.body;
+  if (!amount || !email || !hostUid) {
+    return res.status(400).json({ success: false, error: 'Missing required fields.' });
+  }
+  try {
+    // 1. Get PayPal access token
+    const accessToken = await getPayPalAccessToken();
+
+    // 2. Create payout
+    const payoutData = {
+      sender_batch_header: {
+        sender_batch_id: `batch_${Date.now()}`,
+        email_subject: 'You have a payout from Homezy',
+        email_message: 'You have received a payout!'
+      },
+      items: [
+        {
+          recipient_type: 'EMAIL',
+          amount: {
+            value: amount.toFixed(2),
+            currency: 'PHP'
+          },
+          receiver: email,
+          note: 'Host withdrawal from Homezy',
+          sender_item_id: `item_${Date.now()}`
+        }
+      ]
+    };
+
+    const payoutRes = await axios({
+      url: `${PAYPAL_API_BASE}/v1/payments/payouts`,
+      method: 'post',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      data: payoutData
+    });
+
+    // 3. Only update Firestore if payout is successful
+    if (payoutRes.data && payoutRes.data.batch_header && payoutRes.data.batch_header.batch_status) {
+      // Subtract withdrawn amount from host's earnings (or set a balance field)
+      const hostRef = fs.collection('hosts').doc(hostUid);
+      await hostRef.update({
+        withdrawn: admin.firestore.FieldValue.increment(amount)
+      });
+      return res.status(200).json({ success: true, message: 'Withdrawal successful!', payout: payoutRes.data });
+    } else {
+      return res.status(500).json({ success: false, error: 'Payout failed.' });
+    }
+  } catch (err) {
+    console.error('PayPal withdrawal error:', err.response?.data || err.message);
+    return res.status(500).json({ success: false, error: err.response?.data || err.message });
+  }
+});
+
 // �📧 Generate link + send custom email
 app.post("/send-verification", async (req, res) => {
   const { email, fullName, force } = req.body || {};
@@ -381,10 +463,6 @@ app.post("/send-cancellation", async (req, res) => {
   }
 });
 
-
-// --- User Deletion API (admin only) ---
-const deleteUserRoute = require("./api/deleteUser");
-app.use("/api", deleteUserRoute);
 
 // 🖥️ Run server
 app.listen(4000, () => console.log("✅ Server running on port 4000"));

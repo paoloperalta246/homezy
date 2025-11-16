@@ -88,7 +88,10 @@ const Calendars = () => {
     return { dailyCheckins: ci, dailyCheckouts: co, dailyRevenue: rev, maxDailyRevenue: maxRev };
   })();
 
-  const monthRevenue = bookings.reduce((sum, b) => {
+  // Calculate withdrawn amount from host document (default 0)
+  const withdrawn = host?.withdrawn || 0;
+  // Calculate month revenue as sum of bookings for the month minus withdrawn (capped at 0)
+  const monthRevenueRaw = bookings.reduce((sum, b) => {
     // count booking only if it intersects current month
     const checkIn = b.checkIn?.seconds ? new Date(b.checkIn.seconds * 1000) : b.checkIn ? new Date(b.checkIn) : null;
     if (!checkIn) return sum;
@@ -98,6 +101,7 @@ const Calendars = () => {
     }
     return sum;
   }, 0);
+  const monthRevenue = Math.max(Math.min(monthRevenueRaw, Math.max(monthRevenueRaw - withdrawn, 0)), 0);
 
   // 🔥 Track logged-in user and fetch their Firestore data
   useEffect(() => {
