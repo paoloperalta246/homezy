@@ -373,7 +373,6 @@ const Earnings = () => {
                                   }
                                   // Real withdrawal: call backend
                                   setWithdrawLoading(true);
-                                  // Use Vercel serverless function endpoint for withdrawals
                                   fetch("/api/withdraw", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
