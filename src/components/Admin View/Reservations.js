@@ -392,7 +392,7 @@ const Reservations = () => {
                 </div>
             )}
             {/* Main Content Header */}
-            <main className="flex-1 px-2 sm:px-8 md:px-16 py-4 sm:py-8 md:py-10 pt-16 sm:pt-6 md:pt-10 md:ml-[260px] w-full max-w-full overflow-x-hidden">
+            <main className="flex-1 px-1 sm:px-8 md:px-16 py-4 sm:py-8 md:py-10 pt-16 sm:pt-6 md:pt-10 md:ml-[260px] w-full max-w-full overflow-x-hidden">
                 <div className="mb-6 sm:mb-8">
                     <h2 className="text-xl sm:text-2xl md:text-[32px] font-bold mb-2 flex items-center gap-2">
                         <span className="p-1.5 sm:p-2 rounded-xl bg-orange-500/10 text-orange-600">
@@ -406,7 +406,7 @@ const Reservations = () => {
                 </div>
                 {/* BOOKINGS TABLE PLACEHOLDER */}
                 <div className="bg-white border border-gray-200 rounded-2xl shadow-md p-0 sm:p-6 mt-10 overflow-x-auto">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 pt-6 mb-2 gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 sm:px-6 pt-6 mb-2 gap-4">
                         <h3 className="text-2xl font-extrabold text-gray-900 flex items-center gap-3">
                             <Book className="w-6 h-6 text-orange-500" /> All Bookings
                         </h3>
@@ -418,16 +418,16 @@ const Reservations = () => {
                     ) : (
                         <>
                             {/* Filter UI */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 px-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4 px-2 sm:px-6">
                                 {/* Search */}
-                                <div className="relative w-full sm:w-64">
+                                <div className="relative w-full sm:w-64 min-w-0">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400">
                                         <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
                                     </span>
                                     <input
                                         type="text"
                                         className="pl-10 pr-4 py-2 border border-orange-200 rounded-xl shadow-inner w-full focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
-                                        placeholder="Search by guest, listing, status..."
+                                        placeholder="Search something here..."
                                         value={filter.search}
                                         onChange={e => { setFilter(f => ({ ...f, search: e.target.value })); setCurrentPage(1); }}
                                     />
@@ -438,6 +438,7 @@ const Reservations = () => {
                                     className="px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[110px]"
                                     value={filter.status}
                                     onChange={e => { setFilter(f => ({ ...f, status: e.target.value })); setCurrentPage(1); }}
+                                    style={{ minWidth: 110 }}
                                 >
                                     <option value="">All Statuses</option>
                                     <option value="approved">Approved</option>
@@ -446,28 +447,30 @@ const Reservations = () => {
                                 {/* Start Date Filter */}
                                 <input
                                     type="date"
-                                    className="px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[140px]"
+                                    className="px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[110px] sm:min-w-[140px]"
                                     value={filter.startDate}
                                     onChange={e => { setFilter(f => ({ ...f, startDate: e.target.value })); setCurrentPage(1); }}
                                     max={filter.endDate || undefined}
                                     placeholder="Start date"
                                     title="Start date"
+                                    style={{ minWidth: 110 }}
                                 />
                                 {/* End Date Filter */}
                                 <input
                                     type="date"
-                                    className="px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[140px]"
+                                    className="px-3 py-2 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[110px] sm:min-w-[140px]"
                                     value={filter.endDate}
                                     onChange={e => { setFilter(f => ({ ...f, endDate: e.target.value })); setCurrentPage(1); }}
                                     min={filter.startDate || undefined}
                                     placeholder="End date"
                                     title="End date"
+                                    style={{ minWidth: 110 }}
                                 />
                                 <div className="flex-1" />
                                 <button
                                     onClick={() => setPdfPreview({ open: true, type: 'bookings' })}
-                                    className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
-                                    style={{ minWidth: 160 }}
+                                    className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
+                                    style={{ minWidth: 120 }}
                                 >
                                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
@@ -492,8 +495,9 @@ const Reservations = () => {
                                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                                 </button>
                                             </div>
-                                            <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
-                                                <table className="w-full text-xs sm:text-sm border border-orange-200 rounded-lg">
+                                            <div className="px-1 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                                                <div className="overflow-x-auto">
+                                                <table className="w-full min-w-[600px] text-xs sm:text-sm border border-orange-200 rounded-lg">
                                                     <thead className="bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
                                                         <tr>
                                                             <th className="px-2 py-2 text-left font-bold text-orange-700">Property</th>
@@ -523,6 +527,7 @@ const Reservations = () => {
                                                         )}
                                                     </tbody>
                                                 </table>
+                                                </div>
                                             </div>
                                             <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
                                                 <button
@@ -544,7 +549,66 @@ const Reservations = () => {
                                 )}
                             </div>
                             <div className="w-full max-w-full">
-                                <table className="w-full max-w-full">
+                                {/* Responsive table: stack on mobile */}
+                                <div className="block sm:hidden">
+                                    {(() => {
+                                        // Filtering (use filteredBookings)
+                                        const totalPages = Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE) || 1;
+                                        const page = Math.max(1, Math.min(currentPage, totalPages));
+                                        const startIdx = (page - 1) * BOOKINGS_PER_PAGE;
+                                        const paged = filteredBookings.slice(startIdx, startIdx + BOOKINGS_PER_PAGE);
+                                        return paged
+                                            .filter(b =>
+                                                (b.listingTitle || b.listingId) &&
+                                                (b.guestName || b.guestEmail || b.userId) &&
+                                                (b.checkIn || b.checkOut) &&
+                                                (b.finalPrice || b.price)
+                                            )
+                                            .map((b) => {
+                                                const listingImg = b.listingImage || "/default-listing.png";
+                                                let guest = b.guestName || b.guestEmail || b.userId || "-";
+                                                let initials = guest && typeof guest === 'string' ? guest.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '?';
+                                                let statusClass = "bg-gradient-to-r from-blue-500 to-blue-600 text-white";
+                                                if (["confirmed", "approved", "accepted", "completed"].includes((b.status || "").toLowerCase())) statusClass = "bg-gradient-to-r from-green-500 to-green-600 text-white";
+                                                else if (["pending", "awaiting"].includes((b.status || "").toLowerCase())) statusClass = "bg-gradient-to-r from-yellow-400 to-yellow-500 text-yellow-900";
+                                                else if (["cancelled", "rejected", "declined"].includes((b.status || "").toLowerCase())) statusClass = "bg-gradient-to-r from-red-500 to-red-600 text-white";
+                                                return (
+                                                    <div key={b.id} className="bg-white border border-orange-100 rounded-xl shadow-sm mb-4 p-3 flex flex-col gap-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={listingImg} alt={b.listingTitle} className="w-12 h-12 rounded-lg object-cover" />
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-gray-800 text-sm line-clamp-1">{b.listingTitle || b.listingId || '-'}</div>
+                                                                <div className="text-xs text-gray-500">Booked {b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "N/A"}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-7 h-7 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-xs">{initials}</div>
+                                                            <div>
+                                                                <div className="font-medium text-gray-800 text-xs">{b.guestName || "Guest"}</div>
+                                                                <div className="text-xs text-gray-500 truncate max-w-[100px]">{b.guestEmail || ""}</div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 text-xs">
+                                                            <div className="flex items-center gap-1"><span className="font-semibold">Check-in:</span> {b.checkIn ? (b.checkIn.seconds ? new Date(b.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date(b.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })) : 'N/A'}</div>
+                                                            <div className="flex items-center gap-1"><span className="font-semibold">Check-out:</span> {b.checkOut ? (b.checkOut.seconds ? new Date(b.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : new Date(b.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })) : 'N/A'}</div>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 text-xs">
+                                                            <div className="flex items-center gap-1"><span className="font-semibold">Guests:</span> {(b.guests?.adults || 0) + (b.guests?.children || 0) + (b.guests?.infants || 0) + (b.guests?.pets || 0)}</div>
+                                                            <div className="flex items-center gap-1"><span className="font-semibold">Amount:</span> ₱{(b.finalPrice || b.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold shadow-sm ${statusClass}`}>{b.status === "confirmed" ? "Approved" : b.status ? b.status.charAt(0).toUpperCase() + b.status.slice(1) : "Active"}</span>
+                                                            {b.couponUsed && (
+                                                                <span className="text-xs text-green-600 font-medium flex items-center gap-1">Saved ₱{(b.discount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            });
+                                    })()}
+                                </div>
+                                {/* Desktop table */}
+                                <table className="w-full max-w-full hidden sm:table">
                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-orange-200">
                                         <tr>
                                             <th className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Property</th>
@@ -684,18 +748,18 @@ const Reservations = () => {
                                 </table>
                             </div>
                             {/* Pagination Controls */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 px-6 pb-6">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 px-2 sm:px-6 pb-6">
                                 <div className="text-base text-orange-500 font-semibold">
                                     Page {Reservations._currentPage} of {Reservations._totalPages}
                                 </div>
-                                <div className="flex gap-2 items-center">
+                                <div className="flex gap-2 items-center flex-wrap">
                                     <button
-                                        className="px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition"
+                                        className="px-3 sm:px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition text-xs sm:text-base"
                                         onClick={() => setCurrentPage(1)}
                                         disabled={Reservations._currentPage === 1}
                                     >First</button>
                                     <button
-                                        className="px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition"
+                                        className="px-3 sm:px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition text-xs sm:text-base"
                                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                         disabled={Reservations._currentPage === 1}
                                     >Prev</button>
@@ -712,16 +776,16 @@ const Reservations = () => {
                                                 setPageInput("");
                                             }
                                         }}
-                                        className="w-14 px-2 py-1 rounded-lg border border-orange-200 text-center text-orange-600 font-bold focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition"
+                                        className="w-12 sm:w-14 px-2 py-1 rounded-lg border border-orange-200 text-center text-orange-600 font-bold focus:ring-2 focus:ring-orange-300 focus:border-orange-400 transition text-xs sm:text-base"
                                         placeholder="#"
                                     />
                                     <button
-                                        className="px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition"
+                                        className="px-3 sm:px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition text-xs sm:text-base"
                                         onClick={() => setCurrentPage(p => Math.min(Reservations._totalPages, p + 1))}
                                         disabled={Reservations._currentPage === Reservations._totalPages}
                                     >Next</button>
                                     <button
-                                        className="px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition"
+                                        className="px-3 sm:px-4 py-2 rounded-full border border-orange-200 bg-white text-orange-600 font-bold shadow hover:bg-orange-100 disabled:opacity-50 transition text-xs sm:text-base"
                                         onClick={() => setCurrentPage(Reservations._totalPages)}
                                         disabled={Reservations._currentPage === Reservations._totalPages}
                                     >Last</button>
