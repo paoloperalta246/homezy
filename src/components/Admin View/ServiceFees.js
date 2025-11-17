@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -14,15 +15,15 @@ import autoTable from "jspdf-autotable";
 
 const ServiceFees = () => {
     // PDF Export: Host Subscription Plans
-    const exportHostSubsPDF = () => {
-        if (!hosts.length) return;
+    const exportHostSubsPDF = (hostList = hosts) => {
+        if (!hostList.length) return;
         const doc = new jsPDF();
         doc.setFontSize(18);
         doc.text("Host Subscription Plans", 14, 18);
         autoTable(doc, {
             startY: 26,
             head: [["Host", "Email", "Plan", "Fee (₱)", "Payment Date", "Expires On", "Status"]],
-            body: hosts.map(h => {
+            body: hostList.map(h => {
                 const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
                 // Payment Date
                 let paymentDate = fee && fee.paymentDate && fee.paymentDate.seconds ? new Date(fee.paymentDate.seconds * 1000).toLocaleDateString() : '-';
@@ -57,60 +58,53 @@ const ServiceFees = () => {
         doc.save(`host_subscription_plans_${Date.now()}.pdf`);
     };
 
+
     // PDF Export: Payment History
     const exportPaymentHistoryPDF = () => {
-        if (!serviceFees.length) return;
+        if (!filteredServiceFees.length) return;
         const doc = new jsPDF();
         doc.setFontSize(18);
         doc.text("Payment History", 14, 18);
         autoTable(doc, {
             startY: 26,
             head: [["Host", "Email", "Plan", "Amount", "Paid On", "Expires On", "Status"]],
-            body: serviceFees
-                .slice()
-                .sort((a, b) => {
-                    const aTime = a.paymentDate?.seconds ? a.paymentDate.seconds : 0;
-                    const bTime = b.paymentDate?.seconds ? b.paymentDate.seconds : 0;
-                    return bTime - aTime;
-                })
-                .filter(fee => hosts.find(h => h.id === fee.hostId))
-                .map(fee => {
-                    const host = hosts.find(h => h.id === fee.hostId);
-                    // Paid On
-                    let paidOn = '-';
-                    if (fee.paymentDate) {
-                        if (fee.paymentDate.seconds) paidOn = new Date(fee.paymentDate.seconds * 1000).toLocaleDateString();
-                        else if (fee.paymentDate.toDate) paidOn = fee.paymentDate.toDate().toLocaleDateString();
-                        else if (fee.paymentDate instanceof Date) paidOn = fee.paymentDate.toLocaleDateString();
+            body: filteredServiceFees.map(fee => {
+                const host = hosts.find(h => h.id === fee.hostId);
+                // Paid On
+                let paidOn = '-';
+                if (fee.paymentDate) {
+                    if (fee.paymentDate.seconds) paidOn = new Date(fee.paymentDate.seconds * 1000).toLocaleDateString();
+                    else if (fee.paymentDate.toDate) paidOn = fee.paymentDate.toDate().toLocaleDateString();
+                    else if (fee.paymentDate instanceof Date) paidOn = fee.paymentDate.toLocaleDateString();
+                }
+                // Expires On
+                let expiresOn = '-';
+                if (fee.expirationDate) {
+                    if (fee.expirationDate.seconds) expiresOn = new Date(fee.expirationDate.seconds * 1000).toLocaleDateString();
+                    else if (fee.expirationDate.toDate) expiresOn = fee.expirationDate.toDate().toLocaleDateString();
+                    else if (fee.expirationDate instanceof Date) expiresOn = fee.expirationDate.toLocaleDateString();
+                } else if (fee.paymentDate && fee.plan) {
+                    let paidDate = null;
+                    if (fee.paymentDate.seconds) paidDate = new Date(fee.paymentDate.seconds * 1000);
+                    else if (fee.paymentDate.toDate) paidDate = fee.paymentDate.toDate();
+                    else if (fee.paymentDate instanceof Date) paidDate = fee.paymentDate;
+                    if (paidDate) {
+                        const planDuration = fee.plan === 'basic' ? 1 : fee.plan === 'pro' ? 3 : fee.plan === 'premium' ? 12 : 1;
+                        const expDate = new Date(paidDate);
+                        expDate.setMonth(expDate.getMonth() + planDuration);
+                        expiresOn = expDate.toLocaleDateString();
                     }
-                    // Expires On
-                    let expiresOn = '-';
-                    if (fee.expirationDate) {
-                        if (fee.expirationDate.seconds) expiresOn = new Date(fee.expirationDate.seconds * 1000).toLocaleDateString();
-                        else if (fee.expirationDate.toDate) expiresOn = fee.expirationDate.toDate().toLocaleDateString();
-                        else if (fee.expirationDate instanceof Date) expiresOn = fee.expirationDate.toLocaleDateString();
-                    } else if (fee.paymentDate && fee.plan) {
-                        let paidDate = null;
-                        if (fee.paymentDate.seconds) paidDate = new Date(fee.paymentDate.seconds * 1000);
-                        else if (fee.paymentDate.toDate) paidDate = fee.paymentDate.toDate();
-                        else if (fee.paymentDate instanceof Date) paidDate = fee.paymentDate;
-                        if (paidDate) {
-                            const planDuration = fee.plan === 'basic' ? 1 : fee.plan === 'pro' ? 3 : fee.plan === 'premium' ? 12 : 1;
-                            const expDate = new Date(paidDate);
-                            expDate.setMonth(expDate.getMonth() + planDuration);
-                            expiresOn = expDate.toLocaleDateString();
-                        }
-                    }
-                    return [
-                        host?.fullName || '-',
-                        host?.email || '-',
-                        fee.plan || '-',
-                        `₱${fee.amount}`,
-                        paidOn,
-                        expiresOn,
-                        fee.status === 'paid' ? 'Paid' : fee.status,
-                    ];
-                }),
+                }
+                return [
+                    host?.fullName || '-',
+                    host?.email || '-',
+                    fee.plan || '-',
+                    `₱${fee.amount}`,
+                    paidOn,
+                    expiresOn,
+                    fee.status === 'paid' ? 'Paid' : fee.status,
+                ];
+            }),
             styles: { fontSize: 10, cellPadding: 3 },
             headStyles: { fillColor: [51, 153, 255], textColor: 255, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [237, 245, 255] },
@@ -423,22 +417,94 @@ const ServiceFees = () => {
         if (b.listingId) listingImageMap[b.listingId] = b.listingImage;
     });
 
-    // Pagination state for Payment History
+    // Filtering and Pagination state for Payment History
     const [historyPage, setHistoryPage] = useState(1);
+    const [filter, setFilter] = useState({
+        host: '',
+        plan: '',
+        status: '',
+        startDate: '', // format: 'YYYY-MM-DD'
+        endDate: '',   // format: 'YYYY-MM-DD'
+    });
     const rowsPerPage = 10;
-    const pagedServiceFees = serviceFees
+    // Get unique hosts and plans for filter dropdowns
+    const hostOptions = hosts.map(h => ({ id: h.id, name: h.fullName || h.email || 'Unknown Host' }));
+    const planOptions = Array.from(new Set(serviceFees.map(fee => fee.plan))).filter(Boolean);
+    const statusOptions = ['paid', 'pending', 'rejected'];
+
+    // Filtering logic
+    const filteredServiceFees = serviceFees
         .slice()
         .sort((a, b) => {
             const aTime = a.paymentDate?.seconds ? a.paymentDate.seconds : 0;
             const bTime = b.paymentDate?.seconds ? b.paymentDate.seconds : 0;
             return bTime - aTime;
         })
-        .filter(fee => hosts.find(h => h.id === fee.hostId));
-    const totalPages = Math.ceil(pagedServiceFees.length / rowsPerPage);
-    const paginatedFees = pagedServiceFees.slice((historyPage - 1) * rowsPerPage, historyPage * rowsPerPage);
+        .filter(fee => hosts.find(h => h.id === fee.hostId))
+        .filter(fee => {
+            // Host filter
+            if (filter.host && fee.hostId !== filter.host) return false;
+            // Plan filter
+            if (filter.plan && fee.plan !== filter.plan) return false;
+            // Status filter
+            if (filter.status && fee.status !== filter.status) return false;
+            // Date filter
+            if (filter.startDate) {
+                const paid = fee.paymentDate?.seconds ? new Date(fee.paymentDate.seconds * 1000) : fee.paymentDate?.toDate ? fee.paymentDate.toDate() : (fee.paymentDate instanceof Date ? fee.paymentDate : null);
+                if (!paid || paid < new Date(filter.startDate + 'T00:00:00')) return false;
+            }
+            if (filter.endDate) {
+                const paid = fee.paymentDate?.seconds ? new Date(fee.paymentDate.seconds * 1000) : fee.paymentDate?.toDate ? fee.paymentDate.toDate() : (fee.paymentDate instanceof Date ? fee.paymentDate : null);
+                if (!paid || paid > new Date(filter.endDate + 'T23:59:59')) return false;
+            }
+            return true;
+        });
+    const totalPages = Math.ceil(filteredServiceFees.length / rowsPerPage);
+    const paginatedFees = filteredServiceFees.slice((historyPage - 1) * rowsPerPage, historyPage * rowsPerPage);
 
     // PDF Preview modal state
     const [pdfPreview, setPdfPreview] = useState({ open: false, type: null });
+
+    // For backward compatibility: pagedServiceFees alias for filteredServiceFees
+    const pagedServiceFees = filteredServiceFees;
+
+    // Host Subscription Plans Filters (mirroring Payment History)
+    const [hostSubsFilter, setHostSubsFilter] = useState({
+        host: '',
+        plan: '',
+        status: '',
+        startDate: '',
+        endDate: '',
+    });
+    // Host options for filter
+    const hostSubsHostOptions = hosts.map(h => ({ id: h.id, name: h.fullName || h.email || 'Unknown Host' }));
+    // Plan options for filter
+    const hostSubsPlanOptions = Array.from(new Set(hosts.map(h => h.subscriptionPlan))).filter(Boolean);
+    // Status options for filter
+    const hostSubsStatusOptions = ['paid', 'unpaid'];
+    // Filtering logic for Host Subscription Plans
+    const filteredHosts = hosts.filter(h => {
+        // Host filter
+        if (hostSubsFilter.host && h.id !== hostSubsFilter.host) return false;
+        // Plan filter
+        if (hostSubsFilter.plan && h.subscriptionPlan !== hostSubsFilter.plan) return false;
+        // Status filter
+        const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
+        if (hostSubsFilter.status) {
+            if (hostSubsFilter.status === 'paid' && !fee) return false;
+            if (hostSubsFilter.status === 'unpaid' && fee) return false;
+        }
+        // Date filter
+        if (hostSubsFilter.startDate) {
+            const paid = fee && fee.paymentDate?.seconds ? new Date(fee.paymentDate.seconds * 1000) : fee && fee.paymentDate?.toDate ? fee.paymentDate.toDate() : (fee && fee.paymentDate instanceof Date ? fee.paymentDate : null);
+            if (!paid || paid < new Date(hostSubsFilter.startDate + 'T00:00:00')) return false;
+        }
+        if (hostSubsFilter.endDate) {
+            const paid = fee && fee.paymentDate?.seconds ? new Date(fee.paymentDate.seconds * 1000) : fee && fee.paymentDate?.toDate ? fee.paymentDate.toDate() : (fee && fee.paymentDate instanceof Date ? fee.paymentDate : null);
+            if (!paid || paid > new Date(hostSubsFilter.endDate + 'T23:59:59')) return false;
+        }
+        return true;
+    });
 
     return (
         <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans flex-col md:flex-row">
@@ -765,10 +831,10 @@ const ServiceFees = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {hosts.length === 0 ? (
+                                                {filteredHosts.length === 0 ? (
                                                     <tr><td colSpan={7} className="text-center text-gray-400 py-4">No hosts found.</td></tr>
                                                 ) : (
-                                                    hosts.map((h) => {
+                                                    filteredHosts.map((h) => {
                                                         const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
                                                         let paidOn = '-';
                                                         if (fee && fee.paymentDate) {
@@ -807,8 +873,8 @@ const ServiceFees = () => {
                                     <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
                                         <button
                                             className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
-                                            onClick={() => { exportHostSubsPDF(); setPdfPreview({ open: false, type: null }); }}
-                                            disabled={hosts.length === 0}
+                                            onClick={() => { exportHostSubsPDF(filteredHosts); setPdfPreview({ open: false, type: null }); }}
+                                            disabled={filteredHosts.length === 0}
                                         >
                                             Export to PDF
                                         </button>
@@ -824,10 +890,66 @@ const ServiceFees = () => {
                         )}
                     </div>
                     <p className="px-2 sm:px-0 pb-4 text-orange-700/80 text-sm">Overview of each host's current subscription and payment status.</p>
+                    {/* Host Subscription Plans Filters */}
+                    <div className="flex flex-wrap gap-2 items-center mb-4">
+                        {/* Host Filter */}
+                        <select
+                            className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[120px]"
+                            value={hostSubsFilter.host}
+                            onChange={e => setHostSubsFilter(f => ({ ...f, host: e.target.value }))}
+                        >
+                            <option value="">All Hosts</option>
+                            {hostSubsHostOptions.map(h => (
+                                <option key={h.id} value={h.id}>{h.name}</option>
+                            ))}
+                        </select>
+                        {/* Plan Filter */}
+                        <select
+                            className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[110px]"
+                            value={hostSubsFilter.plan}
+                            onChange={e => setHostSubsFilter(f => ({ ...f, plan: e.target.value }))}
+                        >
+                            <option value="">All Plans</option>
+                            {hostSubsPlanOptions.map(plan => (
+                                <option key={plan} value={plan}>{plan}</option>
+                            ))}
+                        </select>
+                        {/* Status Filter */}
+                        <select
+                            className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[110px]"
+                            value={hostSubsFilter.status}
+                            onChange={e => setHostSubsFilter(f => ({ ...f, status: e.target.value }))}
+                        >
+                            <option value="">All Statuses</option>
+                            {hostSubsStatusOptions.map(status => (
+                                <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                            ))}
+                        </select>
+                        {/* Start Date Filter */}
+                        <input
+                            type="date"
+                            className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[140px]"
+                            value={hostSubsFilter.startDate}
+                            onChange={e => setHostSubsFilter(f => ({ ...f, startDate: e.target.value }))}
+                            max={hostSubsFilter.endDate || undefined}
+                            placeholder="Start date"
+                            title="Start date"
+                        />
+                        {/* End Date Filter */}
+                        <input
+                            type="date"
+                            className="px-3 py-1.5 rounded-lg border border-orange-200 bg-white text-orange-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-300 min-w-[140px]"
+                            value={hostSubsFilter.endDate}
+                            onChange={e => setHostSubsFilter(f => ({ ...f, endDate: e.target.value }))}
+                            min={hostSubsFilter.startDate || undefined}
+                            placeholder="End date"
+                            title="End date"
+                        />
+                    </div>
                     <div className="rounded-2xl overflow-hidden border border-orange-100">
                         {loadingData ? (
                             <p className="p-8 text-orange-400 text-center text-lg font-semibold">Loading service fees...</p>
-                        ) : hosts.length === 0 ? (
+                        ) : filteredHosts.length === 0 ? (
                             <p className="p-8 text-orange-400 text-center text-lg font-semibold">No hosts found.</p>
                         ) : (
                             <>
@@ -854,7 +976,7 @@ const ServiceFees = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-orange-50">
-                                        {hosts.map((h, idx) => {
+                                        {filteredHosts.map((h, idx) => {
                                             // Find service fee payment for this host and their current plan
                                             const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
                                             return (
@@ -915,7 +1037,7 @@ const ServiceFees = () => {
                                 </table>
                                 {/* Mobile stacked cards */}
                                 <div className="flex flex-col gap-3 sm:hidden p-1">
-                                    {hosts.map((h, idx) => {
+                                    {filteredHosts.map((h, idx) => {
                                         const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
                                         return (
                                             <div key={h.id} className={`bg-white border border-orange-100 rounded-xl shadow-sm p-4 flex flex-col gap-2 ${idx % 2 === 0 ? 'bg-orange-50/40' : 'bg-white'}`}>
@@ -972,11 +1094,68 @@ const ServiceFees = () => {
 
                 {/* Payment History Table */}
                 <div className="overflow-x-auto bg-gradient-to-br from-blue-50 via-white to-blue-100 border border-blue-200 rounded-3xl mt-12 mb-8 p-2 sm:p-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-extrabold text-blue-900 px-2 sm:px-0 pt-2 pb-1 flex items-center gap-2">
-                            <DollarSign className="w-7 h-7 text-blue-500" />
-                            Payment History
-                        </h3>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-2xl font-extrabold text-blue-900 px-2 sm:px-0 pt-2 pb-1 flex items-center gap-2">
+                                <DollarSign className="w-7 h-7 text-blue-500" />
+                                Payment History
+                            </h3>
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                            {/* Host Filter */}
+                            <select
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[120px]"
+                                value={filter.host}
+                                onChange={e => { setFilter(f => ({ ...f, host: e.target.value })); setHistoryPage(1); }}
+                            >
+                                <option value="">All Hosts</option>
+                                {hostOptions.map(h => (
+                                    <option key={h.id} value={h.id}>{h.name}</option>
+                                ))}
+                            </select>
+                            {/* Plan Filter */}
+                            <select
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[110px]"
+                                value={filter.plan}
+                                onChange={e => { setFilter(f => ({ ...f, plan: e.target.value })); setHistoryPage(1); }}
+                            >
+                                <option value="">All Plans</option>
+                                {planOptions.map(plan => (
+                                    <option key={plan} value={plan}>{plan}</option>
+                                ))}
+                            </select>
+                            {/* Status Filter */}
+                            <select
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[110px]"
+                                value={filter.status}
+                                onChange={e => { setFilter(f => ({ ...f, status: e.target.value })); setHistoryPage(1); }}
+                            >
+                                <option value="">All Statuses</option>
+                                {statusOptions.map(status => (
+                                    <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                                ))}
+                            </select>
+                            {/* Start Date Filter */}
+                            <input
+                                type="date"
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[140px]"
+                                value={filter.startDate}
+                                onChange={e => { setFilter(f => ({ ...f, startDate: e.target.value })); setHistoryPage(1); }}
+                                max={filter.endDate || undefined}
+                                placeholder="Start date"
+                                title="Start date"
+                            />
+                            {/* End Date Filter */}
+                            <input
+                                type="date"
+                                className="px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[140px]"
+                                value={filter.endDate}
+                                onChange={e => { setFilter(f => ({ ...f, endDate: e.target.value })); setHistoryPage(1); }}
+                                min={filter.startDate || undefined}
+                                placeholder="End date"
+                                title="End date"
+                            />
+                        </div>
                         <button
                             onClick={() => setPdfPreview({ open: true, type: 'paymentHistory' })}
                             className="group bg-gradient-to-r from-blue-500 to-blue-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 relative"
@@ -1019,7 +1198,7 @@ const ServiceFees = () => {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {pagedServiceFees.length === 0 ? (
+                                                {filteredServiceFees.length === 0 ? (
                                                     <tr><td colSpan={7} className="text-center text-gray-400 py-4">No service fee payments found.</td></tr>
                                                 ) : (
                                                     paginatedFees.map((fee) => {
@@ -1067,7 +1246,7 @@ const ServiceFees = () => {
                                         <button
                                             className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
                                             onClick={() => { exportPaymentHistoryPDF(); setPdfPreview({ open: false, type: null }); }}
-                                            disabled={pagedServiceFees.length === 0}
+                                            disabled={filteredServiceFees.length === 0}
                                         >
                                             Export to PDF
                                         </button>
@@ -1107,7 +1286,7 @@ const ServiceFees = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {pagedServiceFees.length === 0 ? (
+                                {filteredServiceFees.length === 0 ? (
                                     <tr><td colSpan={7} className="text-center text-blue-400 py-8 text-lg">No service fee payments found.</td></tr>
                                 ) : paginatedFees.map((fee, idx) => {
                                     const host = hosts.find(h => h.id === fee.hostId);
@@ -1270,7 +1449,7 @@ const ServiceFees = () => {
                         </div>
                     </div>
                 </div>
-                {/* Payment History Modal (moved outside table/main) */}
+
             </main>
             {historyOpen && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">

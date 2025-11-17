@@ -19,6 +19,33 @@ const AdminDashboard = () => {
   const [guestWishlists, setGuestWishlists] = useState([]);
   // Track which wishlists have been marked as read (by id)
   const [readWishlists, setReadWishlists] = useState([]);
+  // Guest Wishlists filter state
+  const [wishlistFilter, setWishlistFilter] = useState({
+    status: '', // '', 'read', 'unread'
+    startDate: '',
+    endDate: ''
+  });
+  // Filtered guest wishlists based on filter state
+  const filteredWishlists = guestWishlists.filter(w => {
+    // Status filter
+    if (wishlistFilter.status === 'read' && !(readWishlists.includes(w.id) || w.read)) return false;
+    if (wishlistFilter.status === 'unread' && (readWishlists.includes(w.id) || w.read)) return false;
+    // Date filter
+    let createdAt = w.createdAt?.seconds
+      ? new Date(w.createdAt.seconds * 1000)
+      : w.createdAt ? new Date(w.createdAt) : null;
+    if (wishlistFilter.startDate && createdAt) {
+      const start = new Date(wishlistFilter.startDate);
+      start.setHours(0, 0, 0, 0);
+      if (createdAt < start) return false;
+    }
+    if (wishlistFilter.endDate && createdAt) {
+      const end = new Date(wishlistFilter.endDate);
+      end.setHours(23, 59, 59, 999);
+      if (createdAt > end) return false;
+    }
+    return true;
+  });
   // Toast/modal state
   const [showReadToast, setShowReadToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -88,13 +115,13 @@ const AdminDashboard = () => {
 
   // Enhanced Wishlists PDF
   const exportWishlistsPDF = () => {
-    if (!guestWishlists.length) return;
+    if (!filteredWishlists.length) return;
     const doc = new jsPDF();
     addPDFHeader(doc, "Guest Wishlists", [236, 72, 153]);
     autoTable(doc, {
       startY: 34,
       head: [["Guest", "Email", "Wishlist", "Date Added"]],
-      body: guestWishlists.map(w => [
+      body: filteredWishlists.map(w => [
         w.guestName || '',
         w.guestEmail || '',
         w.text || w.itemName || w.title || w.name || '',
@@ -521,13 +548,42 @@ const AdminDashboard = () => {
 
         {/* Guest Wishlists Table */}
         <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <div className="p-1.5 sm:p-2 rounded-xl bg-pink-500/10">
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600" />
               </div>
-              <span>Guest Wishlists</span>
-            </h3>
+              <span className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">Guest Wishlists</span>
+              {/* Filters */}
+              <select
+                className="px-3 py-2 rounded-lg border border-pink-200 bg-white text-pink-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-pink-300 min-w-[110px]"
+                value={wishlistFilter.status}
+                onChange={e => setWishlistFilter(f => ({ ...f, status: e.target.value }))}
+                style={{ marginLeft: 8 }}
+              >
+                <option value="">All Statuses</option>
+                <option value="read">Read</option>
+                <option value="unread">Unread</option>
+              </select>
+              <input
+                type="date"
+                className="px-3 py-2 rounded-lg border border-pink-200 bg-white text-pink-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-pink-300 min-w-[140px]"
+                value={wishlistFilter.startDate}
+                onChange={e => setWishlistFilter(f => ({ ...f, startDate: e.target.value }))}
+                max={wishlistFilter.endDate || undefined}
+                placeholder="Start date"
+                title="Start date"
+              />
+              <input
+                type="date"
+                className="px-3 py-2 rounded-lg border border-pink-200 bg-white text-pink-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-pink-300 min-w-[140px]"
+                value={wishlistFilter.endDate}
+                onChange={e => setWishlistFilter(f => ({ ...f, endDate: e.target.value }))}
+                min={wishlistFilter.startDate || undefined}
+                placeholder="End date"
+                title="End date"
+              />
+            </div>
             <button
               onClick={() => setPdfPreview({ open: true, type: 'wishlists' })}
               className="group relative bg-gradient-to-r from-pink-500 to-pink-400 via-pink-600 to-pink-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-300"
@@ -539,69 +595,69 @@ const AdminDashboard = () => {
               <span className="tracking-wide">Export Wishlists PDF</span>
               <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
-                {/* PDF Preview Modal */}
-                {pdfPreview.open && pdfPreview.type === 'wishlists' && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
-                      <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
-                        <h3 className="text-lg sm:text-xl font-semibold text-pink-600 flex items-center gap-2">
-                          <Users className="w-5 h-5 sm:w-6 sm:h-6 text-pink-500 mr-1" />
-                          Guest Wishlists Preview
-                        </h3>
-                        <button
-                          className="p-2 rounded-full hover:bg-gray-100 transition"
-                          onClick={() => setPdfPreview({ open: false, type: null })}
-                          aria-label="Close"
-                        >
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                      <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
-                        <table className="w-full text-xs sm:text-sm border border-pink-200 rounded-lg">
-                          <thead className="bg-gradient-to-r from-pink-50 to-pink-100 border-b-2 border-pink-200">
-                            <tr>
-                              <th className="px-2 py-2 text-left font-bold text-pink-700">Guest</th>
-                              <th className="px-2 py-2 text-left font-bold text-pink-700">Email</th>
-                              <th className="px-2 py-2 text-left font-bold text-pink-700">Wishlist</th>
-                              <th className="px-2 py-2 text-left font-bold text-pink-700">Date Added</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {guestWishlists.length === 0 ? (
-                              <tr><td colSpan={4} className="text-center text-gray-400 py-4">No wishlists found.</td></tr>
-                            ) : (
-                              guestWishlists.map((w) => (
-                                <tr key={w.id} className="border-b border-pink-50">
-                                  <td className="px-2 py-2">{w.guestName || 'Guest'}</td>
-                                  <td className="px-2 py-2">{w.guestEmail || ''}</td>
-                                  <td className="px-2 py-2">{w.text || w.itemName || w.title || w.name || '—'}</td>
-                                  <td className="px-2 py-2">{w.createdAt?.seconds
-                                    ? new Date(w.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                                    : w.createdAt ? new Date(w.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
-                        <button
-                          className="bg-pink-500 hover:bg-pink-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
-                          onClick={() => { exportWishlistsPDF(); setPdfPreview({ open: false, type: null }); }}
-                          disabled={guestWishlists.length === 0}
-                        >
-                          Export to PDF
-                        </button>
-                        <button
-                          className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
-                          onClick={() => setPdfPreview({ open: false, type: null })}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+            {/* PDF Preview Modal */}
+            {pdfPreview.open && pdfPreview.type === 'wishlists' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-pink-600 flex items-center gap-2">
+                      <Users className="w-5 h-5 sm:w-6 sm:h-6 text-pink-500 mr-1" />
+                      Guest Wishlists Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                   </div>
-                )}
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-pink-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-pink-50 to-pink-100 border-b-2 border-pink-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-pink-700">Guest</th>
+                          <th className="px-2 py-2 text-left font-bold text-pink-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-pink-700">Wishlist</th>
+                          <th className="px-2 py-2 text-left font-bold text-pink-700">Date Added</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredWishlists.length === 0 ? (
+                          <tr><td colSpan={4} className="text-center text-gray-400 py-4">No wishlists found.</td></tr>
+                        ) : (
+                          filteredWishlists.map((w) => (
+                            <tr key={w.id} className="border-b border-pink-50">
+                              <td className="px-2 py-2">{w.guestName || 'Guest'}</td>
+                              <td className="px-2 py-2">{w.guestEmail || ''}</td>
+                              <td className="px-2 py-2">{w.text || w.itemName || w.title || w.name || '—'}</td>
+                              <td className="px-2 py-2">{w.createdAt?.seconds
+                                ? new Date(w.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                : w.createdAt ? new Date(w.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-pink-500 hover:bg-pink-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportWishlistsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={guestWishlists.length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md w-full max-w-full overflow-x-auto">
             {/* Desktop/tablet table */}
@@ -622,14 +678,14 @@ const AdminDashboard = () => {
                       Loading wishlists...
                     </td>
                   </tr>
-                ) : guestWishlists.length === 0 ? (
+                ) : filteredWishlists.length === 0 ? (
                   <tr>
                     <td className="px-3 sm:px-4 md:px-6 py-4 text-gray-400 italic" colSpan={5}>
                       No wishlists found.
                     </td>
                   </tr>
                 ) : (
-                  guestWishlists.map((w) => (
+                  filteredWishlists.map((w) => (
                     <tr key={w.id} className="hover:bg-pink-50/30 transition-all duration-200">
                       <td className="px-3 sm:px-4 md:px-6 py-3 sm:py-4">
                         <div className="flex items-center gap-2">
@@ -676,10 +732,10 @@ const AdminDashboard = () => {
             <div className="flex flex-col gap-3 sm:hidden p-1">
               {loadingData ? (
                 <div className="text-pink-400 italic text-center py-4 bg-pink-50 rounded-lg">Loading wishlists...</div>
-              ) : guestWishlists.length === 0 ? (
+              ) : filteredWishlists.length === 0 ? (
                 <div className="text-gray-400 italic text-center py-4 bg-pink-50 rounded-lg">No wishlists found.</div>
               ) : (
-                guestWishlists.map((w) => (
+                filteredWishlists.map((w) => (
                   <div key={w.id} className="bg-white border border-pink-100 rounded-xl shadow-sm p-4 flex flex-col gap-2">
                     <div className="flex items-center gap-3 mb-1">
                       {w.guestPhoto ? (

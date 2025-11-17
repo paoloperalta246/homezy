@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -14,6 +14,33 @@ const GuestsHosts = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hosts, setHosts] = useState([]);
   const [guests, setGuests] = useState([]);
+  // Filtering states
+  const [hostFilter, setHostFilter] = useState({ search: '', status: 'all' });
+  const [guestFilter, setGuestFilter] = useState({ search: '', status: 'all' });
+    // Filtering helpers
+    const filterHosts = hosts.filter(h => {
+      const search = hostFilter.search.toLowerCase();
+      const matchesSearch =
+        h.fullName?.toLowerCase().includes(search) ||
+        h.email?.toLowerCase().includes(search);
+      const matchesStatus =
+        hostFilter.status === 'all' ||
+        (hostFilter.status === 'verified' && h.verified) ||
+        (hostFilter.status === 'unverified' && !h.verified);
+      return matchesSearch && matchesStatus;
+    });
+
+    const filterGuests = guests.filter(g => {
+      const search = guestFilter.search.toLowerCase();
+      const matchesSearch =
+        g.fullName?.toLowerCase().includes(search) ||
+        g.email?.toLowerCase().includes(search);
+      const matchesStatus =
+        guestFilter.status === 'all' ||
+        (guestFilter.status === 'verified' && g.verified) ||
+        (guestFilter.status === 'unverified' && !g.verified);
+      return matchesSearch && matchesStatus;
+    });
   const [loadingData, setLoadingData] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [guestToDelete, setGuestToDelete] = useState(null);
@@ -54,15 +81,15 @@ const GuestsHosts = () => {
   };
 
 
-  // Export Hosts Only
-  const exportHostsPDF = () => {
-    if (!hosts.length) return;
+  // Export Hosts Only (filtered, always up-to-date)
+  const exportHostsPDF = useCallback(() => {
+    if (!filterHosts.length) return;
     const doc = new jsPDF();
     addPDFHeader(doc, "Hosts", [139, 92, 246]);
     autoTable(doc, {
       startY: 34,
       head: [["Name", "Email", "Plan", "Phone", "Status"]],
-      body: hosts.map(h => [
+      body: filterHosts.map(h => [
         h.fullName || '',
         h.email || '',
         h.subscriptionPlan ? (h.subscriptionPlan.charAt(0).toUpperCase() + h.subscriptionPlan.slice(1)) : '-',
@@ -79,17 +106,17 @@ const GuestsHosts = () => {
     });
     addPDFFooter(doc, [139, 92, 246]);
     doc.save(`hosts_${Date.now()}.pdf`);
-  };
+  }, [filterHosts]);
 
-  // Export Guests Only
-  const exportGuestsPDF = () => {
-    if (!guests.length) return;
+  // Export Guests Only (filtered, always up-to-date)
+  const exportGuestsPDF = useCallback(() => {
+    if (!filterGuests.length) return;
     const doc = new jsPDF();
     addPDFHeader(doc, "Guests", [251, 146, 60]);
     autoTable(doc, {
       startY: 34,
       head: [["Name", "Email", "Phone", "Status"]],
-      body: guests.map(g => [
+      body: filterGuests.map(g => [
         g.fullName || '',
         g.email || '',
         g.phone || '-',
@@ -105,7 +132,7 @@ const GuestsHosts = () => {
     });
     addPDFFooter(doc, [251, 146, 60]);
     doc.save(`guests_${Date.now()}.pdf`);
-  };
+  }, [filterGuests]);
 
 
   // Fetch all bookings and reviews for dynamic sections
@@ -363,13 +390,37 @@ const GuestsHosts = () => {
         </div>
         {/* Hosts Table - Modern UI */}
         <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <User className="w-5 h-5 text-purple-600" /> Hosts
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <User className="w-5 h-5 text-purple-600" /> Hosts
+              </h3>
+              {/* Filter UI */}
+              <div className="flex gap-2 ml-2">
+                <input
+                  type="text"
+                  placeholder="Search name or email..."
+                  value={hostFilter.search}
+                  onChange={e => setHostFilter(f => ({ ...f, search: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg border border-purple-200 focus:ring-2 focus:ring-purple-300 text-sm outline-none bg-white placeholder:text-purple-300 min-w-[160px]"
+                  style={{ boxShadow: '0 1px 2px 0 #ede9fe' }}
+                />
+                <select
+                  value={hostFilter.status}
+                  onChange={e => setHostFilter(f => ({ ...f, status: e.target.value }))}
+                  className="px-2 py-1.5 rounded-lg border border-purple-200 focus:ring-2 focus:ring-purple-300 text-sm outline-none bg-white text-purple-700"
+                  style={{ boxShadow: '0 1px 2px 0 #ede9fe' }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="verified">Verified</option>
+                  <option value="unverified">Unverified</option>
+                </select>
+              </div>
+            </div>
             <button
-              onClick={() => setPdfPreview({ open: true, type: 'hosts' })}
-              className="group bg-gradient-to-r from-purple-500 to-purple-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 relative"
+              onClick={() => filterHosts.length && setPdfPreview({ open: true, type: 'hosts' })}
+              disabled={filterHosts.length === 0}
+              className={`group bg-gradient-to-r from-purple-500 to-purple-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm flex items-center gap-2 border-2 border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 relative transition-all ${filterHosts.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:shadow-xl'}`}
               style={{ minWidth: 160 }}
             >
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
@@ -407,10 +458,10 @@ const GuestsHosts = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {hosts.length === 0 ? (
+                        {filterHosts.length === 0 ? (
                           <tr><td colSpan={5} className="text-center text-gray-400 py-4">No hosts found.</td></tr>
                         ) : (
-                          hosts.map((h) => (
+                          filterHosts.map((h) => (
                             <tr key={h.id} className="border-b border-purple-50">
                               <td className="px-2 py-2">{h.fullName || ''}</td>
                               <td className="px-2 py-2">{h.email || ''}</td>
@@ -446,7 +497,7 @@ const GuestsHosts = () => {
           <div className="bg-white border border-purple-100 rounded-2xl shadow-xl">
             {loadingData ? (
               <p className="p-8 text-purple-400 text-center text-lg font-semibold">Loading hosts...</p>
-            ) : hosts.length === 0 ? (
+            ) : filterHosts.length === 0 ? (
               <p className="p-8 text-purple-400 text-center text-lg font-semibold">No hosts found.</p>
             ) : (
               <>
@@ -464,7 +515,7 @@ const GuestsHosts = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-purple-50">
-                    {hosts.map(h => (
+                    {filterHosts.map(h => (
                       <tr key={h.id} className="hover:bg-purple-50/60 transition-all group">
                         <td className="px-6 py-4">
                           {h.photoURL ? (
@@ -499,7 +550,7 @@ const GuestsHosts = () => {
                 </div>
                 {/* Mobile stacked cards */}
                 <div className="flex flex-col gap-3 sm:hidden p-1">
-                  {hosts.map(h => (
+                  {filterHosts.map(h => (
                     <div key={h.id} className="bg-white border border-purple-100 rounded-xl shadow-sm p-4 flex flex-col gap-2">
                       <div className="flex items-center gap-3 mb-1">
                         {h.photoURL ? (
@@ -535,13 +586,37 @@ const GuestsHosts = () => {
 
         {/* Guests Table - Modern UI */}
         <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <Users className="w-5 h-5 text-orange-600" /> Guests
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-orange-600" /> Guests
+              </h3>
+              {/* Filter UI */}
+              <div className="flex gap-2 ml-2">
+                <input
+                  type="text"
+                  placeholder="Search name or email..."
+                  value={guestFilter.search}
+                  onChange={e => setGuestFilter(f => ({ ...f, search: e.target.value }))}
+                  className="px-3 py-1.5 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-300 text-sm outline-none bg-white placeholder:text-orange-300 min-w-[160px]"
+                  style={{ boxShadow: '0 1px 2px 0 #ffedd5' }}
+                />
+                <select
+                  value={guestFilter.status}
+                  onChange={e => setGuestFilter(f => ({ ...f, status: e.target.value }))}
+                  className="px-2 py-1.5 rounded-lg border border-orange-200 focus:ring-2 focus:ring-orange-300 text-sm outline-none bg-white text-orange-700"
+                  style={{ boxShadow: '0 1px 2px 0 #ffedd5' }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="verified">Verified</option>
+                  <option value="unverified">Unverified</option>
+                </select>
+              </div>
+            </div>
             <button
-              onClick={() => setPdfPreview({ open: true, type: 'guests' })}
-              className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
+              onClick={() => filterGuests.length && setPdfPreview({ open: true, type: 'guests' })}
+              disabled={filterGuests.length === 0}
+              className={`group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative transition-all ${filterGuests.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:shadow-xl'}`}
               style={{ minWidth: 160 }}
             >
               <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/20 mr-2">
@@ -578,10 +653,10 @@ const GuestsHosts = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {guests.length === 0 ? (
+                        {filterGuests.length === 0 ? (
                           <tr><td colSpan={4} className="text-center text-gray-400 py-4">No guests found.</td></tr>
                         ) : (
-                          guests.map((g) => (
+                          filterGuests.map((g) => (
                             <tr key={g.id} className="border-b border-orange-50">
                               <td className="px-2 py-2">{g.fullName || ''}</td>
                               <td className="px-2 py-2">{g.email || ''}</td>
@@ -616,7 +691,7 @@ const GuestsHosts = () => {
           <div className="bg-white border border-orange-100 rounded-2xl shadow-xl">
             {loadingData ? (
               <p className="p-8 text-orange-400 text-center text-lg font-semibold">Loading guests...</p>
-            ) : guests.length === 0 ? (
+            ) : filterGuests.length === 0 ? (
               <p className="p-8 text-orange-400 text-center text-lg font-semibold">No guests found.</p>
             ) : (
               <>
@@ -633,7 +708,7 @@ const GuestsHosts = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-orange-50">
-                    {guests.map(g => (
+                    {filterGuests.map(g => (
                       <tr key={g.id} className="hover:bg-orange-50/60 transition-all group">
                         <td className="px-6 py-4">
                           {g.photoURL ? (
@@ -659,7 +734,7 @@ const GuestsHosts = () => {
                 </div>
                 {/* Mobile stacked cards */}
                 <div className="flex flex-col gap-3 sm:hidden p-1">
-                  {guests.map(g => (
+                  {filterGuests.map(g => (
                     <div key={g.id} className="bg-white border border-orange-100 rounded-xl shadow-sm p-4 flex flex-col gap-2">
                       <div className="flex items-center gap-3 mb-1">
                         {g.photoURL ? (
