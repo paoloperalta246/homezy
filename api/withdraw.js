@@ -73,6 +73,43 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: 'PayPal payout failed', details: payoutData });
     }
 
+    // 3. Save withdrawal record to Firestore
+    try {
+      // Lazy import to avoid issues in serverless
+      const { initializeApp, applicationDefault, cert } = require('firebase-admin/app');
+      const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+      const admin = require('firebase-admin');
+
+      // Only initialize once
+      if (!admin.apps.length) {
+        let credential;
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+          // Use service account from env variable (Vercel/Netlify)
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          credential = admin.credential.cert(serviceAccount);
+        } else {
+          // Fallback to application default (local dev with GOOGLE_APPLICATION_CREDENTIALS)
+          credential = admin.credential.applicationDefault();
+        }
+        admin.initializeApp({ credential });
+      }
+      const db = getFirestore();
+      const hostRef = db.collection('hosts').doc(hostUid);
+      await hostRef.collection('withdrawals').add({
+        amount: Number(amount),
+        email,
+        createdAt: Timestamp.now(),
+        payoutBatchId: payoutData.batch_header?.payout_batch_id || null,
+        status: payoutData.batch_header?.batch_status || 'PENDING',
+      });
+      // Optionally update withdrawn total
+      await hostRef.set({
+        withdrawn: admin.firestore.FieldValue.increment(Number(amount))
+      }, { merge: true });
+    } catch (firestoreErr) {
+      // Log but don't block payout response
+      console.error('Error saving withdrawal to Firestore:', firestoreErr);
+    }
     // Success: return payout info
     return res.status(200).json({ success: true, payout: payoutData });
   } catch (err) {

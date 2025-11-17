@@ -63,6 +63,8 @@ const initialPolicies = [
 ];
 
 function PolicyCompliance() {
+    // PDF Preview modal state
+    const [pdfPreview, setPdfPreview] = useState({ open: false, policy: null });
     // State for adding a new policy
     const [newPolicy, setNewPolicy] = useState({
         title: '',
@@ -698,10 +700,53 @@ function PolicyCompliance() {
                                                     <button
                                                         className="bg-gradient-to-r from-blue-500 to-blue-400 hover:from-blue-600 hover:to-blue-500 text-white px-3 py-2 sm:px-4 rounded-lg text-xs sm:text-sm font-semibold shadow transition-all duration-150"
                                                         type="button"
-                                                        onClick={() => exportPolicyPDF(policy)}
+                                                        onClick={() => setPdfPreview({ open: true, policy })}
                                                     >
                                                         Export PDF
                                                     </button>
+                                                                {/* PDF Preview Modal for Policy Export */}
+                                                                {pdfPreview.open && pdfPreview.policy && (
+                                                                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                                                                        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                                                                            <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                                                                                <h3 className="text-lg sm:text-xl font-semibold text-blue-600 flex items-center gap-2">
+                                                                                    <FileTextIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mr-1" />
+                                                                                    Policy Preview
+                                                                                </h3>
+                                                                                <button
+                                                                                    className="p-2 rounded-full hover:bg-gray-100 transition"
+                                                                                    onClick={() => setPdfPreview({ open: false, policy: null })}
+                                                                                    aria-label="Close"
+                                                                                >
+                                                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                                                                                <div className="mb-2">
+                                                                                    <span className="font-bold text-lg text-blue-900">{pdfPreview.policy.title}</span>
+                                                                                    <span className="ml-3 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-semibold uppercase">{pdfPreview.policy.type}</span>
+                                                                                </div>
+                                                                                <div className="text-gray-700 whitespace-pre-line text-base border border-gray-100 rounded-lg p-3 bg-gray-50 mb-2" style={{ minHeight: 60 }}>
+                                                                                    {pdfPreview.policy.content}
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                                                                                <button
+                                                                                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                                                                                    onClick={() => { exportPolicyPDF(pdfPreview.policy); setPdfPreview({ open: false, policy: null }); }}
+                                                                                >
+                                                                                    Export to PDF
+                                                                                </button>
+                                                                                <button
+                                                                                    className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                                                                                    onClick={() => setPdfPreview({ open: false, policy: null })}
+                                                                                >
+                                                                                    Cancel
+                                                                                </button>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                     <button
                                                         className="bg-gradient-to-r from-red-500 to-red-400 hover:from-red-600 hover:to-red-500 text-white px-3 py-2 sm:px-4 rounded-lg text-xs sm:text-sm font-semibold shadow transition-all duration-150"
                                                         onClick={() => handleDeletePolicy(idx)}

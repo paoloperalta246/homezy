@@ -382,17 +382,20 @@ const Earnings = () => {
                                       hostUid: host?.uid || host?.id || null
                                     })
                                   })
+
                                     .then(async (res) => {
                                       const data = await res.json();
                                       if (!res.ok) throw new Error(data.error || "Withdrawal failed");
                                       // After successful withdrawal, refetch host and withdrawals to update UI
                                       try {
-                                        const hostId = host?.uid || host?.id;
+                                        // Always refetch the host document using the current user's UID
+                                        const user = auth.currentUser;
+                                        const hostId = user?.uid;
                                         if (hostId) {
                                           const hostRef = doc(db, "hosts", hostId);
                                           const hostSnap = await getDoc(hostRef);
                                           if (hostSnap.exists()) {
-                                            setHost(hostSnap.data());
+                                            setHost({ ...hostSnap.data(), uid: hostId });
                                             // Refetch withdrawals
                                             const withdrawalsRef = collection(hostRef, "withdrawals");
                                             const withdrawalsSnap = await getDocs(withdrawalsRef);

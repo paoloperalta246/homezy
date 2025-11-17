@@ -20,6 +20,8 @@ const GuestsHosts = () => {
   const [deleteError, setDeleteError] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState("");
+  // PDF Preview modal state
+  const [pdfPreview, setPdfPreview] = useState({ open: false, type: null });
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -366,7 +368,7 @@ const GuestsHosts = () => {
               <User className="w-5 h-5 text-purple-600" /> Hosts
             </h3>
             <button
-              onClick={exportHostsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'hosts' })}
               className="group bg-gradient-to-r from-purple-500 to-purple-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300 relative"
               style={{ minWidth: 160 }}
             >
@@ -376,6 +378,69 @@ const GuestsHosts = () => {
               <span className="tracking-wide">Export Hosts PDF</span>
               <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+            {/* PDF Preview Modal for Hosts */}
+            {pdfPreview.open && pdfPreview.type === 'hosts' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-purple-600 flex items-center gap-2">
+                      <User className="w-5 h-5 sm:w-6 sm:h-6 text-purple-500 mr-1" />
+                      Hosts Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-purple-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-purple-50 to-purple-100 border-b-2 border-purple-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-purple-700">Name</th>
+                          <th className="px-2 py-2 text-left font-bold text-purple-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-purple-700">Plan</th>
+                          <th className="px-2 py-2 text-left font-bold text-purple-700">Phone</th>
+                          <th className="px-2 py-2 text-left font-bold text-purple-700">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {hosts.length === 0 ? (
+                          <tr><td colSpan={5} className="text-center text-gray-400 py-4">No hosts found.</td></tr>
+                        ) : (
+                          hosts.map((h) => (
+                            <tr key={h.id} className="border-b border-purple-50">
+                              <td className="px-2 py-2">{h.fullName || ''}</td>
+                              <td className="px-2 py-2">{h.email || ''}</td>
+                              <td className="px-2 py-2">{h.subscriptionPlan ? (h.subscriptionPlan.charAt(0).toUpperCase() + h.subscriptionPlan.slice(1)) : '-'}</td>
+                              <td className="px-2 py-2">{h.phone || '-'}</td>
+                              <td className="px-2 py-2">{h.verified ? 'Verified' : 'Unverified'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-purple-500 hover:bg-purple-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportHostsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={hosts.length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           {/* Table wrapper is horizontally scrollable, cards are not */}
           <div className="bg-white border border-purple-100 rounded-2xl shadow-xl">
@@ -475,7 +540,7 @@ const GuestsHosts = () => {
               <Users className="w-5 h-5 text-orange-600" /> Guests
             </h3>
             <button
-              onClick={exportGuestsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'guests' })}
               className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
               style={{ minWidth: 160 }}
             >
@@ -485,6 +550,67 @@ const GuestsHosts = () => {
               <span className="tracking-wide">Export Guests PDF</span>
               <span className="absolute -top-2 -right-2 bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+            {/* PDF Preview Modal for Guests */}
+            {pdfPreview.open && pdfPreview.type === 'guests' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-orange-600 flex items-center gap-2">
+                      <Users className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 mr-1" />
+                      Guests Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-orange-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-orange-700">Name</th>
+                          <th className="px-2 py-2 text-left font-bold text-orange-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-orange-700">Phone</th>
+                          <th className="px-2 py-2 text-left font-bold text-orange-700">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guests.length === 0 ? (
+                          <tr><td colSpan={4} className="text-center text-gray-400 py-4">No guests found.</td></tr>
+                        ) : (
+                          guests.map((g) => (
+                            <tr key={g.id} className="border-b border-orange-50">
+                              <td className="px-2 py-2">{g.fullName || ''}</td>
+                              <td className="px-2 py-2">{g.email || ''}</td>
+                              <td className="px-2 py-2">{g.phone || '-'}</td>
+                              <td className="px-2 py-2">{g.verified ? 'Verified' : 'Unverified'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportGuestsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={guests.length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           {/* Table wrapper is horizontally scrollable, cards are not */}
           <div className="bg-white border border-orange-100 rounded-2xl shadow-xl">

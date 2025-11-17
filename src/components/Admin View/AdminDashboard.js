@@ -22,6 +22,8 @@ const AdminDashboard = () => {
   // Toast/modal state
   const [showReadToast, setShowReadToast] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
+  // PDF Preview modal state
+  const [pdfPreview, setPdfPreview] = useState({ open: false, type: null });
   // Derived: recent bookings (last 5, sorted by createdAt desc)
   const recentBookings = [...bookings]
     .sort((a, b) => {
@@ -527,7 +529,7 @@ const AdminDashboard = () => {
               <span>Guest Wishlists</span>
             </h3>
             <button
-              onClick={exportWishlistsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'wishlists' })}
               className="group relative bg-gradient-to-r from-pink-500 to-pink-400 via-pink-600 to-pink-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-300"
               style={{ minWidth: 140 }}
             >
@@ -537,6 +539,69 @@ const AdminDashboard = () => {
               <span className="tracking-wide">Export Wishlists PDF</span>
               <span className="absolute -top-2 -right-2 bg-pink-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+                {/* PDF Preview Modal */}
+                {pdfPreview.open && pdfPreview.type === 'wishlists' && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                      <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                        <h3 className="text-lg sm:text-xl font-semibold text-pink-600 flex items-center gap-2">
+                          <Users className="w-5 h-5 sm:w-6 sm:h-6 text-pink-500 mr-1" />
+                          Guest Wishlists Preview
+                        </h3>
+                        <button
+                          className="p-2 rounded-full hover:bg-gray-100 transition"
+                          onClick={() => setPdfPreview({ open: false, type: null })}
+                          aria-label="Close"
+                        >
+                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                      <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                        <table className="w-full text-xs sm:text-sm border border-pink-200 rounded-lg">
+                          <thead className="bg-gradient-to-r from-pink-50 to-pink-100 border-b-2 border-pink-200">
+                            <tr>
+                              <th className="px-2 py-2 text-left font-bold text-pink-700">Guest</th>
+                              <th className="px-2 py-2 text-left font-bold text-pink-700">Email</th>
+                              <th className="px-2 py-2 text-left font-bold text-pink-700">Wishlist</th>
+                              <th className="px-2 py-2 text-left font-bold text-pink-700">Date Added</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {guestWishlists.length === 0 ? (
+                              <tr><td colSpan={4} className="text-center text-gray-400 py-4">No wishlists found.</td></tr>
+                            ) : (
+                              guestWishlists.map((w) => (
+                                <tr key={w.id} className="border-b border-pink-50">
+                                  <td className="px-2 py-2">{w.guestName || 'Guest'}</td>
+                                  <td className="px-2 py-2">{w.guestEmail || ''}</td>
+                                  <td className="px-2 py-2">{w.text || w.itemName || w.title || w.name || '—'}</td>
+                                  <td className="px-2 py-2">{w.createdAt?.seconds
+                                    ? new Date(w.createdAt.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                    : w.createdAt ? new Date(w.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                        <button
+                          className="bg-pink-500 hover:bg-pink-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                          onClick={() => { exportWishlistsPDF(); setPdfPreview({ open: false, type: null }); }}
+                          disabled={guestWishlists.length === 0}
+                        >
+                          Export to PDF
+                        </button>
+                        <button
+                          className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                          onClick={() => setPdfPreview({ open: false, type: null })}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md w-full max-w-full overflow-x-auto">
             {/* Desktop/tablet table */}
@@ -649,7 +714,7 @@ const AdminDashboard = () => {
               <span>Recent Bookings</span>
             </h3>
             <button
-              onClick={exportRecentBookingsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'recentBookings' })}
               className="group relative bg-gradient-to-r from-blue-500 to-blue-400 via-blue-600 to-blue-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
               style={{ minWidth: 140 }}
             >
@@ -659,6 +724,75 @@ const AdminDashboard = () => {
               <span className="tracking-wide">Export Bookings PDF</span>
               <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+            {/* PDF Preview Modal for Recent Bookings */}
+            {pdfPreview.open && pdfPreview.type === 'recentBookings' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-blue-600 flex items-center gap-2">
+                      <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mr-1" />
+                      Recent Bookings Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-blue-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Property</th>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Guest</th>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Check-in</th>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Check-out</th>
+                          <th className="px-2 py-2 text-left font-bold text-blue-700">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentBookings.length === 0 ? (
+                          <tr><td colSpan={6} className="text-center text-gray-400 py-4">No bookings found.</td></tr>
+                        ) : (
+                          recentBookings.map((b) => (
+                            <tr key={b.id} className="border-b border-blue-50">
+                              <td className="px-2 py-2">{b.listingTitle || '—'}</td>
+                              <td className="px-2 py-2">{b.guestName || 'Guest'}</td>
+                              <td className="px-2 py-2">{b.guestEmail || ''}</td>
+                              <td className="px-2 py-2">{b.checkIn?.seconds
+                                ? new Date(b.checkIn.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                : b.checkIn ? new Date(b.checkIn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
+                              <td className="px-2 py-2">{b.checkOut?.seconds
+                                ? new Date(b.checkOut.seconds * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                                : b.checkOut ? new Date(b.checkOut).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : 'N/A'}</td>
+                              <td className="px-2 py-2">₱{(b.finalPrice || b.price || 0).toLocaleString()}.00</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportRecentBookingsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={recentBookings.length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (
@@ -763,7 +897,7 @@ const AdminDashboard = () => {
               <span>Best Reviewed Bookings</span>
             </h3>
             <button
-              onClick={exportBestReviewsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'bestReviews' })}
               className="group relative bg-gradient-to-r from-green-500 to-green-400 via-green-600 to-green-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-green-400 focus:outline-none focus:ring-2 focus:ring-green-300"
               style={{ minWidth: 140 }}
             >
@@ -773,6 +907,69 @@ const AdminDashboard = () => {
               <span className="tracking-wide">Export Best Reviews</span>
               <span className="absolute -top-2 -right-2 bg-green-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+            {/* PDF Preview Modal for Best Reviews */}
+            {pdfPreview.open && pdfPreview.type === 'bestReviews' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-green-600 flex items-center gap-2">
+                      <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-green-500 mr-1" />
+                      Best Reviewed Bookings Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-green-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-green-50 to-green-100 border-b-2 border-green-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-green-700">Property</th>
+                          <th className="px-2 py-2 text-left font-bold text-green-700">Guest</th>
+                          <th className="px-2 py-2 text-left font-bold text-green-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-green-700">Rating</th>
+                          <th className="px-2 py-2 text-left font-bold text-green-700">Comment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reviews.filter(r => typeof r.rating === 'number').sort((a, b) => b.rating - a.rating).slice(0, 5).length === 0 ? (
+                          <tr><td colSpan={5} className="text-center text-gray-400 py-4">No reviews found.</td></tr>
+                        ) : (
+                          reviews.filter(r => typeof r.rating === 'number').sort((a, b) => b.rating - a.rating).slice(0, 5).map((r) => (
+                            <tr key={r.id} className="border-b border-green-50">
+                              <td className="px-2 py-2">{r.listingName || r.listingTitle || '—'}</td>
+                              <td className="px-2 py-2">{r.name || 'Guest'}</td>
+                              <td className="px-2 py-2">{r.email || ''}</td>
+                              <td className="px-2 py-2">{r.rating}</td>
+                              <td className="px-2 py-2">{r.comment || '—'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportBestReviewsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={reviews.filter(r => typeof r.rating === 'number').sort((a, b) => b.rating - a.rating).slice(0, 5).length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (
@@ -873,7 +1070,7 @@ const AdminDashboard = () => {
               <span>Lowest Reviewed Bookings</span>
             </h3>
             <button
-              onClick={exportLowestReviewsPDF}
+              onClick={() => setPdfPreview({ open: true, type: 'lowestReviews' })}
               className="group relative bg-gradient-to-r from-red-500 to-red-400 via-red-600 to-red-500 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-red-400 focus:outline-none focus:ring-2 focus:ring-red-300"
               style={{ minWidth: 140 }}
             >
@@ -883,6 +1080,69 @@ const AdminDashboard = () => {
               <span className="tracking-wide">Export Lowest Reviews</span>
               <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
             </button>
+            {/* PDF Preview Modal for Lowest Reviews */}
+            {pdfPreview.open && pdfPreview.type === 'lowestReviews' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                    <h3 className="text-lg sm:text-xl font-semibold text-red-600 flex items-center gap-2">
+                      <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 mr-1" />
+                      Lowest Reviewed Bookings Preview
+                    </h3>
+                    <button
+                      className="p-2 rounded-full hover:bg-gray-100 transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                  <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                    <table className="w-full text-xs sm:text-sm border border-red-200 rounded-lg">
+                      <thead className="bg-gradient-to-r from-red-50 to-red-100 border-b-2 border-red-200">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-bold text-red-700">Property</th>
+                          <th className="px-2 py-2 text-left font-bold text-red-700">Guest</th>
+                          <th className="px-2 py-2 text-left font-bold text-red-700">Email</th>
+                          <th className="px-2 py-2 text-left font-bold text-red-700">Rating</th>
+                          <th className="px-2 py-2 text-left font-bold text-red-700">Comment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reviews.filter(r => typeof r.rating === 'number').sort((a, b) => a.rating - b.rating).slice(0, 5).length === 0 ? (
+                          <tr><td colSpan={5} className="text-center text-gray-400 py-4">No reviews found.</td></tr>
+                        ) : (
+                          reviews.filter(r => typeof r.rating === 'number').sort((a, b) => a.rating - b.rating).slice(0, 5).map((r) => (
+                            <tr key={r.id} className="border-b border-red-50">
+                              <td className="px-2 py-2">{r.listingName || r.listingTitle || '—'}</td>
+                              <td className="px-2 py-2">{r.name || 'Guest'}</td>
+                              <td className="px-2 py-2">{r.email || ''}</td>
+                              <td className="px-2 py-2">{r.rating}</td>
+                              <td className="px-2 py-2">{r.comment || '—'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                    <button
+                      className="bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                      onClick={() => { exportLowestReviewsPDF(); setPdfPreview({ open: false, type: null }); }}
+                      disabled={reviews.filter(r => typeof r.rating === 'number').sort((a, b) => a.rating - b.rating).slice(0, 5).length === 0}
+                    >
+                      Export to PDF
+                    </button>
+                    <button
+                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                      onClick={() => setPdfPreview({ open: false, type: null })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-md overflow-x-auto w-full max-w-full">
             {loadingData ? (

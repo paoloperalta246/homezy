@@ -437,6 +437,9 @@ const ServiceFees = () => {
     const totalPages = Math.ceil(pagedServiceFees.length / rowsPerPage);
     const paginatedFees = pagedServiceFees.slice((historyPage - 1) * rowsPerPage, historyPage * rowsPerPage);
 
+    // PDF Preview modal state
+    const [pdfPreview, setPdfPreview] = useState({ open: false, type: null });
+
     return (
         <div className="flex min-h-screen bg-[#FFFFFF] text-[#23364A] font-sans flex-col md:flex-row">
             {/* Mobile Hamburger */}
@@ -721,7 +724,7 @@ const ServiceFees = () => {
                             Host Subscription Plans
                         </h3>
                         <button
-                            onClick={exportHostSubsPDF}
+                            onClick={() => setPdfPreview({ open: true, type: 'hostSubs' })}
                             className="group bg-gradient-to-r from-orange-500 to-orange-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-300 relative"
                             style={{ minWidth: 160 }}
                         >
@@ -731,6 +734,94 @@ const ServiceFees = () => {
                             <span className="tracking-wide">Export as PDF</span>
                             <span className="absolute -top-2 -right-2 bg-orange-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
                         </button>
+                        {/* PDF Preview Modal for Host Subscription Plans */}
+                        {pdfPreview.open && pdfPreview.type === 'hostSubs' && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                                    <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                                        <h3 className="text-lg sm:text-xl font-semibold text-orange-600 flex items-center gap-2">
+                                            <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 mr-1" />
+                                            Host Subscription Plans Preview
+                                        </h3>
+                                        <button
+                                            className="p-2 rounded-full hover:bg-gray-100 transition"
+                                            onClick={() => setPdfPreview({ open: false, type: null })}
+                                            aria-label="Close"
+                                        >
+                                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                    <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                                        <table className="w-full text-xs sm:text-sm border border-orange-200 rounded-lg">
+                                            <thead className="bg-gradient-to-r from-orange-50 to-orange-100 border-b-2 border-orange-200">
+                                                <tr>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Host</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Email</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Plan</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Fee (₱)</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Payment Date</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Expires On</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-orange-700">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {hosts.length === 0 ? (
+                                                    <tr><td colSpan={7} className="text-center text-gray-400 py-4">No hosts found.</td></tr>
+                                                ) : (
+                                                    hosts.map((h) => {
+                                                        const fee = serviceFees.find(f => f.hostId === h.id && f.plan === h.subscriptionPlan);
+                                                        let paidOn = '-';
+                                                        if (fee && fee.paymentDate) {
+                                                            if (fee.paymentDate.seconds) paidOn = new Date(fee.paymentDate.seconds * 1000).toLocaleDateString();
+                                                            else if (fee.paymentDate.toDate) paidOn = fee.paymentDate.toDate().toLocaleDateString();
+                                                            else if (fee.paymentDate instanceof Date) paidOn = fee.paymentDate.toLocaleDateString();
+                                                        }
+                                                        let expiresOn = '-';
+                                                        if (fee && fee.expirationDate) {
+                                                            if (fee.expirationDate.seconds) expiresOn = new Date(fee.expirationDate.seconds * 1000).toLocaleDateString();
+                                                            else if (fee.expirationDate.toDate) expiresOn = fee.expirationDate.toDate().toLocaleDateString();
+                                                            else if (fee.expirationDate instanceof Date) expiresOn = fee.expirationDate.toLocaleDateString();
+                                                        } else if (fee && fee.paymentDate && h.subscriptionPlan) {
+                                                            const planDuration = h.subscriptionPlan === 'basic' ? 1 : h.subscriptionPlan === 'pro' ? 3 : h.subscriptionPlan === 'premium' ? 12 : 1;
+                                                            const paidDate = new Date(fee.paymentDate.seconds * 1000);
+                                                            const expDate = new Date(paidDate);
+                                                            expDate.setMonth(expDate.getMonth() + planDuration);
+                                                            expiresOn = expDate.toLocaleDateString();
+                                                        }
+                                                        return (
+                                                            <tr key={h.id} className="border-b border-orange-50">
+                                                                <td className="px-2 py-2">{h.fullName || '-'}</td>
+                                                                <td className="px-2 py-2">{h.email || '-'}</td>
+                                                                <td className="px-2 py-2">{h.subscriptionPlan || '-'}</td>
+                                                                <td className="px-2 py-2">{h.subscriptionPrice ? `₱${h.subscriptionPrice}` : '-'}</td>
+                                                                <td className="px-2 py-2">{paidOn}</td>
+                                                                <td className="px-2 py-2">{expiresOn}</td>
+                                                                <td className="px-2 py-2">{fee ? 'Paid' : 'Unpaid'}</td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                                        <button
+                                            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                                            onClick={() => { exportHostSubsPDF(); setPdfPreview({ open: false, type: null }); }}
+                                            disabled={hosts.length === 0}
+                                        >
+                                            Export to PDF
+                                        </button>
+                                        <button
+                                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                                            onClick={() => setPdfPreview({ open: false, type: null })}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <p className="px-2 sm:px-0 pb-4 text-orange-700/80 text-sm">Overview of each host's current subscription and payment status.</p>
                     <div className="rounded-2xl overflow-hidden border border-orange-100">
@@ -887,7 +978,7 @@ const ServiceFees = () => {
                             Payment History
                         </h3>
                         <button
-                            onClick={exportPaymentHistoryPDF}
+                            onClick={() => setPdfPreview({ open: true, type: 'paymentHistory' })}
                             className="group bg-gradient-to-r from-blue-500 to-blue-400 text-white px-5 py-2.5 rounded-xl shadow-lg font-bold text-xs sm:text-sm hover:scale-105 hover:shadow-xl transition-all flex items-center gap-2 border-2 border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-300 relative"
                             style={{ minWidth: 160 }}
                         >
@@ -897,6 +988,99 @@ const ServiceFees = () => {
                             <span className="tracking-wide">Export as PDF</span>
                             <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full shadow-md font-bold opacity-80 group-hover:opacity-100 transition">PDF</span>
                         </button>
+                        {/* PDF Preview Modal for Payment History */}
+                        {pdfPreview.open && pdfPreview.type === 'paymentHistory' && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                                <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-0 relative border border-gray-100 mx-2 sm:mx-0 max-h-[90vh] flex flex-col">
+                                    <div className="flex items-center justify-between px-4 sm:px-6 pt-5 pb-2 border-b border-gray-100">
+                                        <h3 className="text-lg sm:text-xl font-semibold text-blue-600 flex items-center gap-2">
+                                            <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500 mr-1" />
+                                            Payment History Preview
+                                        </h3>
+                                        <button
+                                            className="p-2 rounded-full hover:bg-gray-100 transition"
+                                            onClick={() => setPdfPreview({ open: false, type: null })}
+                                            aria-label="Close"
+                                        >
+                                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                    </div>
+                                    <div className="px-4 sm:px-6 pt-3 pb-2 overflow-x-auto" style={{ maxHeight: '60vh' }}>
+                                        <table className="w-full text-xs sm:text-sm border border-blue-200 rounded-lg">
+                                            <thead className="bg-gradient-to-r from-blue-50 to-blue-100 border-b-2 border-blue-200">
+                                                <tr>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Host</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Email</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Plan</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Amount</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Paid On</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Expires On</th>
+                                                    <th className="px-2 py-2 text-left font-bold text-blue-700">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pagedServiceFees.length === 0 ? (
+                                                    <tr><td colSpan={7} className="text-center text-gray-400 py-4">No service fee payments found.</td></tr>
+                                                ) : (
+                                                    paginatedFees.map((fee) => {
+                                                        const host = hosts.find(h => h.id === fee.hostId);
+                                                        let paidOn = '-';
+                                                        if (fee.paymentDate) {
+                                                            if (fee.paymentDate.seconds) paidOn = new Date(fee.paymentDate.seconds * 1000).toLocaleDateString();
+                                                            else if (fee.paymentDate.toDate) paidOn = fee.paymentDate.toDate().toLocaleDateString();
+                                                            else if (fee.paymentDate instanceof Date) paidOn = fee.paymentDate.toLocaleDateString();
+                                                        }
+                                                        let expiresOn = '-';
+                                                        if (fee.expirationDate) {
+                                                            if (fee.expirationDate.seconds) expiresOn = new Date(fee.expirationDate.seconds * 1000).toLocaleDateString();
+                                                            else if (fee.expirationDate.toDate) expiresOn = fee.expirationDate.toDate().toLocaleDateString();
+                                                            else if (fee.expirationDate instanceof Date) expiresOn = fee.expirationDate.toLocaleDateString();
+                                                        } else if (fee.paymentDate && fee.plan) {
+                                                            let paidDate = null;
+                                                            if (fee.paymentDate.seconds) paidDate = new Date(fee.paymentDate.seconds * 1000);
+                                                            else if (fee.paymentDate.toDate) paidDate = fee.paymentDate.toDate();
+                                                            else if (fee.paymentDate instanceof Date) paidDate = fee.paymentDate;
+                                                            if (paidDate) {
+                                                                const planDuration = fee.plan === 'basic' ? 1 : fee.plan === 'pro' ? 3 : fee.plan === 'premium' ? 12 : 1;
+                                                                const expDate = new Date(paidDate);
+                                                                expDate.setMonth(expDate.getMonth() + planDuration);
+                                                                expiresOn = expDate.toLocaleDateString();
+                                                            }
+                                                        }
+                                                        return (
+                                                            <tr key={fee.id} className="border-b border-blue-50">
+                                                                <td className="px-2 py-2">{host?.fullName || '-'}</td>
+                                                                <td className="px-2 py-2">{host?.email || '-'}</td>
+                                                                <td className="px-2 py-2">{fee.plan}</td>
+                                                                <td className="px-2 py-2">₱{fee.amount}</td>
+                                                                <td className="px-2 py-2">{paidOn}</td>
+                                                                <td className="px-2 py-2">{expiresOn}</td>
+                                                                <td className="px-2 py-2">{fee.status === 'paid' ? 'Paid' : fee.status}</td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="flex justify-end gap-2 px-4 sm:px-6 pb-5 pt-2 border-t border-gray-100">
+                                        <button
+                                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-2 rounded-lg shadow transition"
+                                            onClick={() => { exportPaymentHistoryPDF(); setPdfPreview({ open: false, type: null }); }}
+                                            disabled={pagedServiceFees.length === 0}
+                                        >
+                                            Export to PDF
+                                        </button>
+                                        <button
+                                            className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-lg transition"
+                                            onClick={() => setPdfPreview({ open: false, type: null })}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     <p className="px-2 sm:px-0 pb-4 text-blue-700/80 text-sm">All service fee transactions by all hosts.</p>
                     <div className="rounded-2xl overflow-visible border border-blue-100">
